@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.env
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+build/
+.env.local
+
+# Whisper model cache
+~/.cache/whisper/
+
+# IDE
+.vscode/
+.idea/
+*.DS_Store
+
+
+
+backend/aienv/
