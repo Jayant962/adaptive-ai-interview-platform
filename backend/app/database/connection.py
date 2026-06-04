@@ -8,6 +8,16 @@ db_url = settings.DATABASE_URL
 if not db_url or db_url == "":
     db_url = "sqlite:///./interview.db"
 
+# Replace postgres:// with postgresql:// if present (Render/Heroku URL normalization for SQLAlchemy 1.4+)
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+if db_url.startswith("sqlite"):
+    print("[WARNING] DATABASE_URL is empty or not set. Falling back to SQLite local database (./interview.db).")
+    print("[WARNING] WARNING: SQLite databases are ephemeral on Render. All data will be LOST when the backend redeploys or restarts!")
+else:
+    print(f"Connecting to database with URL scheme: {db_url.split('://')[0]}://...")
+
 connect_args = {}
 if db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False

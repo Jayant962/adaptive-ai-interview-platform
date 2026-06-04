@@ -38,16 +38,21 @@ export function createSpeechRecognition({ onResult, onEnd, onError, onStart }) {
   }
 
   recognition.onresult = (event) => {
-    interimTranscript = ''
+    let accumulatedFinal = ''
+    let accumulatedInterim = ''
 
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript
-      if (event.results[i].isFinal) {
-        finalTranscript += transcript + ' '
+    for (let i = 0; i < event.results.length; i++) {
+      const result = event.results[i]
+      const transcript = result[0].transcript
+      if (result.isFinal) {
+        accumulatedFinal += transcript + ' '
       } else {
-        interimTranscript += transcript
+        accumulatedInterim += transcript
       }
     }
+
+    finalTranscript = accumulatedFinal
+    interimTranscript = accumulatedInterim
 
     onResult?.({
       final: finalTranscript.trim(),

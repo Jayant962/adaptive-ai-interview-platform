@@ -127,6 +127,9 @@ export default function InterviewPage() {
   }, [currentQuestion, sessionId, speakQuestion, setPhase])
 
   const startRecording = useCallback(() => {
+    // 1. Ensure any active TTS is stopped to free up the audio channel
+    stopSpeaking()
+
     if (!isSpeechRecognitionSupported()) {
       alert('Speech recognition is not supported. Please use Chrome or Edge.')
       return
@@ -163,14 +166,16 @@ export default function InterviewPage() {
           }
           setLiveTranscript('')
           
-          console.log('Speech recognition ended automatically. Restarting...')
-          if (recognitionRef.current) {
-            try {
-              startRecognition(recognitionRef.current)
-            } catch (err) {
-              console.error('Failed to restart speech recognition:', err)
+          console.log('Speech recognition ended automatically. Restarting in 200ms...')
+          setTimeout(() => {
+            if (isRecordingRef.current && recognitionRef.current) {
+              try {
+                startRecognition(recognitionRef.current)
+              } catch (err) {
+                console.error('Failed to restart speech recognition:', err)
+              }
             }
-          }
+          }, 200)
         } else {
           // Intentionally stopped
           if (final) {
@@ -188,7 +193,24 @@ export default function InterviewPage() {
       },
       onError: (err) => {
         console.error('Speech recognition error:', err)
-        // We let onend handle the termination or auto-restart
+        
+        // Stop recording state for critical errors to prevent infinite crash loops
+        const criticalErrors = ['not-allowed', 'audio-capture', 'service-not-allowed', 'network']
+        if (criticalErrors.includes(err)) {
+          isRecordingRef.current = false
+          setIsRecording(false)
+          setAvatarState(AVATAR_STATES.IDLE)
+          
+          let errMsg = `Speech recognition error: ${err}`
+          if (err === 'not-allowed') {
+            errMsg = 'Microphone permission was denied, or the page is not running over a secure connection (HTTPS). On mobile devices, browsers restrict microphone access and speech APIs to secure origins (HTTPS/localhost). Please enable permissions and use HTTPS.'
+          } else if (err === 'audio-capture') {
+            errMsg = 'Could not access your microphone. Please check if another application or browser tab is using it.'
+          } else if (err === 'network') {
+            errMsg = 'Network connection lost. Speech recognition requires an active internet connection.'
+          }
+          alert(errMsg)
+        }
       },
     })
 
