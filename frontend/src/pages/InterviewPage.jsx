@@ -47,6 +47,8 @@ export default function InterviewPage() {
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const answerStartTime = useRef(null)
+  const isRecordingRef = useRef(false)
+  const accumulatedTranscriptRef = useRef('')
   const { seconds: totalSeconds, formatted: totalFormatted } = useTimer(true)
   const { seconds: answerSeconds, formatted: answerFormatted, reset: resetAnswerTimer } = useTimer(isRecording)
 
@@ -98,30 +100,58 @@ export default function InterviewPage() {
     answerStartTime.current = Date.now()
     resetAnswerTimer()
 
+    isRecordingRef.current = true
+    accumulatedTranscriptRef.current = ''
+    setIsRecording(true)
+
     recognitionRef.current = createSpeechRecognition({
       onStart: () => {
-        setIsRecording(true)
         setAvatarState(AVATAR_STATES.LISTENING)
       },
       onResult: ({ final, interim }) => {
-        if (final) setFinalTranscript(final)
-        else setLiveTranscript(interim)
+        const currentFinal = final || ''
+        const fullFinal = (accumulatedTranscriptRef.current + ' ' + currentFinal).trim()
+        
+        if (currentFinal) {
+          setFinalTranscript(fullFinal)
+        }
+        setLiveTranscript(interim || '')
       },
       onEnd: (final) => {
-        setIsRecording(false)
-        if (final) setFinalTranscript(final)
-        setAvatarState(AVATAR_STATES.IDLE)
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          mediaRecorderRef.current.stop()
+        if (isRecordingRef.current) {
+          // Speech recognition stopped automatically due to silence/timeout. Let's restart it!
+          if (final) {
+            accumulatedTranscriptRef.current = (accumulatedTranscriptRef.current + ' ' + final).trim()
+            setFinalTranscript(accumulatedTranscriptRef.current)
+          }
+          setLiveTranscript('')
+          
+          console.log('Speech recognition ended automatically. Restarting...')
+          if (recognitionRef.current) {
+            try {
+              startRecognition(recognitionRef.current)
+            } catch (err) {
+              console.error('Failed to restart speech recognition:', err)
+            }
+          }
+        } else {
+          // Intentionally stopped
+          if (final) {
+            const fullFinal = (accumulatedTranscriptRef.current + ' ' + final).trim()
+            setFinalTranscript(fullFinal)
+          }
+          setLiveTranscript('')
+          setAvatarState(AVATAR_STATES.IDLE)
+          setIsRecording(false)
+          
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop()
+          }
         }
       },
       onError: (err) => {
-        setIsRecording(false)
-        setAvatarState(AVATAR_STATES.IDLE)
         console.error('Speech recognition error:', err)
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          mediaRecorderRef.current.stop()
-        }
+        // We let onend handle the termination or auto-restart
       },
     })
 
@@ -154,12 +184,14 @@ export default function InterviewPage() {
   }, [resetAnswerTimer])
 
   const stopRecording = useCallback(() => {
+    isRecordingRef.current = false
+    setIsRecording(false)
+    setAvatarState(AVATAR_STATES.IDLE)
+    
     stopRecognition(recognitionRef.current)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     }
-    setIsRecording(false)
-    setAvatarState(AVATAR_STATES.IDLE)
   }, [])
 
   const handleReRecord = useCallback(() => {
@@ -167,6 +199,7 @@ export default function InterviewPage() {
     setLiveTranscript('')
     setAudioUrl(null)
     stopSpeaking()
+    accumulatedTranscriptRef.current = ''
   }, [])
 
   const handleSubmitAnswer = useCallback(async () => {
@@ -295,6 +328,7 @@ export default function InterviewPage() {
 
   const handleExit = () => {
     stopSpeaking()
+    isRecordingRef.current = false
     abortRecognition(recognitionRef.current)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
