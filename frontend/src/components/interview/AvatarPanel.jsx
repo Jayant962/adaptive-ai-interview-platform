@@ -43,10 +43,10 @@ const POSES = {
     spine: { x: 0.04, y: 0, z: 0 }, // Slight forward lean
     neck: { x: 0, y: 0, z: 0 },
     head: { x: 0, y: 0, z: 0 },
-    leftArm: { x: -2.554, y: 1.387, z: -2.151 }, // Relaxed left arm
-    rightArm: { x: -1.35, y: -0.65, z: 0.8 }, // Right arm gesturing at chest height
-    rightForeArm: { x: 0, y: 1.15, z: 0.0 }, // Forearm bent forward
-    leftForeArm: { x: 0, y: 0, z: 0 },
+    leftArm: { x: 0, y: 0, z: 2.79 },
+    rightArm: { x: 0, y: 0, z: -2.79 },
+    rightForeArm: { x: 1.5, y: 0.5, z: 0.0 }, // Forearm bent forward (chest level, open hand gesture facing viewer)
+    leftForeArm: { x: 0.15, y: 0, z: 0 },
     leftEye: { x: 0, y: 0 },
     rightEye: { x: 0, y: 0 },
     // Blendshape weights
@@ -59,28 +59,28 @@ const POSES = {
   [AVATAR_STATES.LISTENING]: {
     spine: { x: 0, y: 0, z: 0 },
     neck: { x: 0, y: 0, z: 0 },
-    head: { x: 0.01, y: 0, z: 0.14 }, // Head tilted 8 degrees (~0.14 rad)
-    leftArm: { x: -2.554, y: 1.387, z: -2.151 }, // Symmetrical open arms
-    rightArm: { x: -2.554, y: -1.387, z: 2.151 },
-    rightForeArm: { x: 0, y: 0, z: 0 },
-    leftForeArm: { x: 0, y: 0, z: 0 },
+    head: { x: 0.01, y: 0, z: 0.14 }, // Head tilted 8 degrees (~0.14 rad) to one side
+    leftArm: { x: 0, y: 0, z: 2.79 },
+    rightArm: { x: 0, y: 0, z: -2.79 },
+    rightForeArm: { x: 0.15, y: 0, z: 0 },
+    leftForeArm: { x: 0.15, y: 0, z: 0 },
     leftEye: { x: 0, y: 0 },
     rightEye: { x: 0, y: 0 },
     // Blendshape weights
     browUp: 0,
     eyeWide: 0,
-    squint: 0.15, // Attentive eyes
-    smile: 0.32, // Closed-mouth smile
+    squint: 0.15, // Soft/attentive eyes
+    smile: 0.32, // Gentle closed-mouth smile
     browFurrow: 0,
   },
   [AVATAR_STATES.THINKING]: { // ANALYZING
     spine: { x: 0, y: 0, z: 0 },
     neck: { x: 0, y: 0, z: 0 },
     head: { x: 0.02, y: -0.04, z: 0.0 }, // Head slightly tilted/angled
-    leftArm: { x: -2.554, y: 1.387, z: -2.151 },
-    rightArm: { x: -1.15, y: -0.42, z: 0.35 }, // Right arm raised towards chin
-    rightForeArm: { x: 0, y: 1.55, z: 0.20 }, // Hand near chin
-    leftForeArm: { x: 0, y: 0, z: 0 },
+    leftArm: { x: 0, y: 0, z: 2.79 },
+    rightArm: { x: 0, y: 0, z: -2.79 },
+    rightForeArm: { x: 2.2, y: 0.5, z: 0.0 }, // Forearm bent up to chin/jaw level
+    leftForeArm: { x: 0.15, y: 0, z: 0 },
     leftEye: { x: -0.08, y: 0.05 }, // Shifted slightly upward, thinking gaze
     rightEye: { x: -0.08, y: 0.05 },
     // Blendshape weights
@@ -94,10 +94,10 @@ const POSES = {
     spine: { x: 0, y: 0, z: 0 },
     neck: { x: 0, y: 0, z: 0 },
     head: { x: 0, y: 0, z: 0 },
-    leftArm: { x: -2.554, y: 1.387, z: -2.151 },
-    rightArm: { x: -2.554, y: -1.387, z: 2.151 },
-    rightForeArm: { x: 0, y: 0, z: 0 },
-    leftForeArm: { x: 0, y: 0, z: 0 },
+    leftArm: { x: 0, y: 0, z: 2.79 },
+    rightArm: { x: 0, y: 0, z: -2.79 },
+    rightForeArm: { x: 0.15, y: 0, z: 0 },
+    leftForeArm: { x: 0.15, y: 0, z: 0 },
     leftEye: { x: 0, y: 0 },
     rightEye: { x: 0, y: 0 },
     // Blendshape weights
@@ -192,16 +192,16 @@ function AvatarModel({ avatarState, onModelLoaded }) {
     spine: { x: 0, y: 0, z: 0 },
     neck: { x: 0, y: 0, z: 0 },
     head: { x: 0, y: 0, z: 0 },
-    leftArm: { x: -2.554, y: 1.387, z: -2.151 },
-    rightArm: { x: -2.554, y: -1.387, z: 2.151 },
-    rightForeArm: { x: 0, y: 0, z: 0 },
-    leftForeArm: { x: 0, y: 0, z: 0 },
+    leftArm: { x: 0, y: 0, z: 2.79 },
+    rightArm: { x: 0, y: 0, z: -2.79 },
+    rightForeArm: { x: 0.15, y: 0, z: 0 },
+    leftForeArm: { x: 0.15, y: 0, z: 0 },
     leftEye: { x: 0, y: 0 },
     rightEye: { x: 0, y: 0 },
     browUp: 0,
     eyeWide: 0,
     squint: 0,
-    smile: 0,
+    smile: 0.05,
     browFurrow: 0
   })
 
@@ -239,11 +239,11 @@ function AvatarModel({ avatarState, onModelLoaded }) {
     })
     setSkinnedMeshes(meshes)
 
-    // Symmetrical initial posture
-    if (leftShoulderRef.current) leftShoulderRef.current.rotation.set(0, 0, 0)
-    if (rightShoulderRef.current) rightShoulderRef.current.rotation.set(0, 0, 0)
-    if (leftArmRef.current) leftArmRef.current.rotation.set(-2.554, 1.387, -2.151)
-    if (rightArmRef.current) rightArmRef.current.rotation.set(-2.554, -1.387, 2.151)
+    // Symmetrical initial posture (shoulder rotated down -20 deg, upper arms pointing downward)
+    if (leftShoulderRef.current) leftShoulderRef.current.rotation.set(0, 0, -0.35)
+    if (rightShoulderRef.current) rightShoulderRef.current.rotation.set(0, 0, 0.35)
+    if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, 2.79)
+    if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, -2.79)
 
     // Center model base
     const box = new THREE.Box3().setFromObject(scene)
@@ -325,15 +325,15 @@ function AvatarModel({ avatarState, onModelLoaded }) {
       neckRef.current.rotation.z = currentPose.neck.z
     }
     if (headRef.current) {
-      // Attentive head nodding in LISTENING state
-      const listeningNod = (avatarState === AVATAR_STATES.LISTENING) ? (Math.sin(time * 2.2) * 0.012 + 0.012) : 0
+      // Attentive head nodding in LISTENING state (1 nod per 5 seconds: 1.2566 rad/s)
+      const listeningNod = (avatarState === AVATAR_STATES.LISTENING) ? (Math.sin(time * 1.2566) * 0.015 + 0.015) : 0
       headRef.current.rotation.x = currentPose.head.x + microHeadX + listeningNod
       headRef.current.rotation.y = currentPose.head.y + microHeadY
       headRef.current.rotation.z = currentPose.head.z
     }
 
-    if (leftShoulderRef.current) leftShoulderRef.current.rotation.set(0, 0, 0)
-    if (rightShoulderRef.current) rightShoulderRef.current.rotation.set(0, 0, 0)
+    if (leftShoulderRef.current) leftShoulderRef.current.rotation.set(0, 0, -0.35)
+    if (rightShoulderRef.current) rightShoulderRef.current.rotation.set(0, 0, 0.35)
 
     // Arms locked to waist height/sides, will never raise above shoulder level passively
     if (leftArmRef.current) {
@@ -511,11 +511,11 @@ export default function AvatarPanel({ avatarState = AVATAR_STATES.IDLE, avatarUr
           />
         ) : (
           <AvatarErrorBoundary fallback={<FallbackAvatar avatarState={avatarState} config={config} />}>
-            {/* Plain solid-color Deep Navy background with soft edge vignette */}
+            {/* Plain solid flat color Deep Navy background */}
             <div 
               className="absolute inset-0 transition-opacity duration-1000"
               style={{ 
-                background: 'radial-gradient(circle, #1B2A4A 72%, #0c1424 100%)',
+                backgroundColor: '#1B2A4A',
               }}
             />
             
