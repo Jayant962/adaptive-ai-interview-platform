@@ -51,6 +51,22 @@ async def get_profile(
     return current_user
 
 
+@router.post("/test-email")
+async def test_email(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_db_user)
+):
+    """
+    Send a test welcome email to the current logged-in user.
+    Helpful to verify SMTP configuration.
+    """
+    if not current_user.email or "@" not in current_user.email:
+        raise HTTPException(status_code=400, detail="User has no valid email address")
+    
+    background_tasks.add_task(send_welcome_email, current_user.email, current_user.name)
+    return {"message": f"Test welcome email scheduled for {current_user.email}"}
+
+
 @router.get("/check/{clerk_user_id}")
 async def check_user_exists(
     clerk_user_id: str,

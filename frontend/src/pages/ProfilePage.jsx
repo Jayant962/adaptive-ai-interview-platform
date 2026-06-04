@@ -5,13 +5,31 @@ import { User, Mail, Calendar, Edit3, LogOut, Shield, Mic } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import { Card, Badge } from '../components/ui'
 import { useAuthContext } from '../context/AuthContext'
+import { sendTestEmail } from '../services/api'
 
 export default function ProfilePage() {
   const { user } = useUser()
   const { signOut } = useClerk()
-  const { dbUser } = useAuthContext()
+  const { dbUser, getAuthToken } = useAuthContext()
   const navigate = useNavigate()
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailStatus, setEmailStatus] = useState(null)
+  
+  const handleSendTestEmail = async () => {
+    setSendingEmail(true)
+    setEmailStatus(null)
+    try {
+      const token = await getAuthToken()
+      const result = await sendTestEmail(token)
+      setEmailStatus({ success: true, message: result.message || 'Test welcome email sent!' })
+    } catch (err) {
+      console.error(err)
+      setEmailStatus({ success: false, message: err.message || 'Failed to send test email.' })
+    } finally {
+      setSendingEmail(false)
+    }
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -104,16 +122,37 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        {/* Danger Zone */}
+        {/* Account Actions */}
         <Card className="p-6">
-          <h3 className="text-red-400 font-bold mb-4">Account Actions</h3>
-          <button
-            onClick={() => setShowSignOutConfirm(true)}
-            className="flex items-center gap-3 px-5 py-3 bg-red-900/20 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-900/30 transition-colors text-sm font-semibold"
-          >
-            <LogOut size={15} />
-            Sign Out
-          </button>
+          <h3 className="text-white font-bold mb-4">Account Actions</h3>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleSendTestEmail}
+              disabled={sendingEmail}
+              className="flex items-center justify-center gap-3 px-5 py-3 bg-primary-600/20 border border-primary-500/30 text-primary-400 rounded-xl hover:bg-primary-600/30 disabled:opacity-50 transition-colors text-sm font-semibold"
+            >
+              <Mail size={15} />
+              {sendingEmail ? 'Sending Test Email...' : 'Send Test Welcome Email'}
+            </button>
+            
+            <button
+              onClick={() => setShowSignOutConfirm(true)}
+              className="flex items-center justify-center gap-3 px-5 py-3 bg-red-900/20 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-900/30 transition-colors text-sm font-semibold"
+            >
+              <LogOut size={15} />
+              Sign Out
+            </button>
+          </div>
+
+          {emailStatus && (
+            <div className={`mt-4 p-3 rounded-xl text-xs font-semibold ${
+              emailStatus.success 
+                ? 'bg-green-500/10 border border-green-500/20 text-green-400' 
+                : 'bg-red-500/10 border border-red-500/20 text-red-400'
+            }`}>
+              {emailStatus.message}
+            </div>
+          )}
         </Card>
       </div>
 

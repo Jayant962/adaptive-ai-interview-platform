@@ -48,6 +48,10 @@ export async function getProfile(token) {
   return apiFetch('/api/auth/profile', {}, token)
 }
 
+export async function sendTestEmail(token) {
+  return apiFetch('/api/auth/test-email', { method: 'POST' }, token)
+}
+
 // ─────────────────────────────────────────────
 // INTERVIEW
 // ─────────────────────────────────────────────
