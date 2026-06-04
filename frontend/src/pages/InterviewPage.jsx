@@ -37,7 +37,6 @@ export default function InterviewPage() {
 
   const [isRecording, setIsRecording] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [muted, setMuted] = useState(false)
   const [questionLog, setQuestionLog] = useState([])
   const [exitConfirm, setExitConfirm] = useState(false)
   const [audioUrl, setAudioUrl] = useState(null)
@@ -51,6 +50,7 @@ export default function InterviewPage() {
   const answerStartTime = useRef(null)
   const isRecordingRef = useRef(false)
   const accumulatedTranscriptRef = useRef('')
+  const shouldSpeakRef = useRef(true)
   const { seconds: totalSeconds, formatted: totalFormatted } = useTimer(true)
   const { seconds: answerSeconds, formatted: answerFormatted, reset: resetAnswerTimer } = useTimer(isRecording)
 
@@ -64,11 +64,6 @@ export default function InterviewPage() {
   }, [sessionId])
 
   const speakQuestion = useCallback((text) => {
-    if (muted) {
-      setPhase(INTERVIEW_PHASES.RECORDING)
-      setAvatarState(AVATAR_STATES.LISTENING)
-      return
-    }
     setPhase(INTERVIEW_PHASES.QUESTION)
     setAvatarState(AVATAR_STATES.SPEAKING)
     speakText(text, {
@@ -82,17 +77,24 @@ export default function InterviewPage() {
         setAvatarState(AVATAR_STATES.LISTENING)
       }
     })
-  }, [muted, setPhase, setAvatarState])
+  }, [setPhase, setAvatarState])
 
   // Load voices and speak first question on mount
   useEffect(() => {
     if (!currentQuestion || !sessionId) return
+    let active = true
+    shouldSpeakRef.current = true
+    
     loadVoices().then(() => {
-      setPhase(INTERVIEW_PHASES.QUESTION)
-      speakQuestion(currentQuestion)
+      if (active && shouldSpeakRef.current) {
+        setPhase(INTERVIEW_PHASES.QUESTION)
+        speakQuestion(currentQuestion)
+      }
     })
 
     return () => {
+      active = false
+      shouldSpeakRef.current = false
       // Clean up TTS audio
       stopSpeaking()
       isRecordingRef.current = false
@@ -128,8 +130,10 @@ export default function InterviewPage() {
   }, [currentQuestion, sessionId, speakQuestion, setPhase])
 
   const startRecording = useCallback(() => {
-    // 1. Ensure any active TTS is stopped to free up the audio channel
+    shouldSpeakRef.current = false
     stopSpeaking()
+    setAvatarState(AVATAR_STATES.IDLE)
+    setPhase(INTERVIEW_PHASES.RECORDING)
 
     setFinalTranscript('')
     setLiveTranscript('')
@@ -296,7 +300,7 @@ export default function InterviewPage() {
           startRecognition(recognitionRef.current)
         })
     }
-  }, [resetAnswerTimer, isMobile, setFinalTranscript, setLiveTranscript, setAudioUrl, setIsRecording, setAvatarState])
+  }, [resetAnswerTimer, isMobile, setFinalTranscript, setLiveTranscript, setAudioUrl, setIsRecording, setAvatarState, setPhase])
 
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false
@@ -425,7 +429,6 @@ export default function InterviewPage() {
       })
       setFinalTranscript('')
       setLiveTranscript('')
-      speakQuestion(pendingFollowUp.follow_up_question)
       return
     }
 
@@ -447,16 +450,17 @@ export default function InterviewPage() {
       })
       setFinalTranscript('')
       setLiveTranscript('')
-      speakQuestion(result.question_text)
     } catch (err) {
       console.error('Next question error:', err)
     } finally {
       setLoadingNext(false)
     }
-  }, [sessionId, speakQuestion, setAudioUrl, setFeedback, interview, setFollowUp, setFinalTranscript, setLiveTranscript, setAvatarState, handleEndInterview, setQuestion, getAuthToken])
+  }, [sessionId, setAudioUrl, setFeedback, interview, setFollowUp, setFinalTranscript, setLiveTranscript, setAvatarState, handleEndInterview, setQuestion, getAuthToken])
 
   const handleExit = () => {
+    shouldSpeakRef.current = false
     stopSpeaking()
+    setAvatarState(AVATAR_STATES.IDLE)
     isRecordingRef.current = false
     abortRecognition(recognitionRef.current)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -488,14 +492,17 @@ export default function InterviewPage() {
           <Badge variant={diffBadge[difficulty?.toLowerCase()] || 'default'}>{difficulty}</Badge>
           <Badge variant="primary">{topic}</Badge>
           <span className="text-gray-400 text-sm font-mono bg-dark-600 px-3 py-1 rounded-lg">{totalFormatted}</span>
+          {sessionId && (phase === INTERVIEW_PHASES.QUESTION || phase === INTERVIEW_PHASES.RECORDING) && (
+            <button
+              onClick={() => speakQuestion(currentQuestion)}
+              className="px-3 py-1 rounded-lg bg-dark-600 hover:bg-dark-500 text-gray-300 hover:text-white transition-colors text-xs font-semibold flex items-center gap-1.5"
+            >
+              <Volume2 size={14} />
+              Re-listen
+            </button>
+          )}
           <button
-            onClick={() => setMuted(m => !m)}
-            className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-          >
-            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-          </button>
-          <button
-            onClick={() => setExitConfirm(true)}
+            onClick={() => { shouldSpeakRef.current = false; stopSpeaking(); setExitConfirm(true); }}
             className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors"
           >
             <X size={15} />
@@ -504,113 +511,128 @@ export default function InterviewPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden">
-        {/* Left: Avatar */}
-        <div className="lg:w-[42%] flex-none bg-dark-800 p-4 flex flex-col gap-4" style={{ minHeight: '40vh' }}>
-          <div className="flex-1 rounded-2xl overflow-hidden" style={{ minHeight: '280px', maxHeight: '480px' }}>
-            <AvatarPanel avatarState={avatarState} />
+      <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto">
+        <div className="flex flex-col lg:flex-row gap-4 lg:min-h-[calc(100vh-140px)]">
+          {/* Left: Avatar Column */}
+          <div className="lg:w-[42%] flex-none bg-dark-800 p-4 flex flex-col gap-4 rounded-2xl" style={{ minHeight: '80vh' }}>
+            <div className="flex-1 rounded-2xl overflow-hidden" style={{ minHeight: '380px', maxHeight: '600px' }}>
+              <AvatarPanel avatarState={avatarState} />
+            </div>
+
+            {/* Question progress sidebar */}
+            <div className="bg-dark-700/60 border border-white/8 rounded-2xl p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-3">
+                Question {questionNumber} of {totalQuestions}
+              </p>
+              <div className="flex gap-1.5 flex-wrap">
+                {Array.from({ length: totalQuestions }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
+                      i + 1 < questionNumber
+                        ? 'bg-green-600/30 text-green-400 border border-green-500/30'
+                        : i + 1 === questionNumber
+                        ? 'bg-primary-600/40 text-primary-300 border border-primary-500/40 scale-110'
+                        : 'bg-dark-600 text-gray-600 border border-white/5'
+                    }`}
+                  >
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Question progress sidebar */}
-          <div className="bg-dark-700/60 border border-white/8 rounded-2xl p-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-3">
-              Question {questionNumber} of {totalQuestions}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {Array.from({ length: totalQuestions }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                    i + 1 < questionNumber
-                      ? 'bg-green-600/30 text-green-400 border border-green-500/30'
-                      : i + 1 === questionNumber
-                      ? 'bg-primary-600/40 text-primary-300 border border-primary-500/40 scale-110'
-                      : 'bg-dark-600 text-gray-600 border border-white/5'
-                  }`}
-                >
-                  {i + 1}
+          {/* Right: Question + Recording */}
+          <div className="flex-1 flex flex-col gap-4" style={{ minHeight: '80vh' }}>
+            {/* Current Question */}
+            <Card className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {followUpCount > 0 ? `Follow-Up ${followUpCount}` : `Question ${questionNumber}`}
+                </span>
+                {followUpCount > 0 && (
+                  <Badge variant="warning">Follow-up</Badge>
+                )}
+              </div>
+              <p className="text-white text-base sm:text-lg font-medium leading-relaxed">
+                {currentQuestion || 'Loading question...'}
+              </p>
+            </Card>
+
+            {/* Phase: ENDING */}
+            {phase === INTERVIEW_PHASES.ENDING && (
+              <Card className="p-6 text-center">
+                <div className="w-16 h-16 bg-primary-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
                 </div>
-              ))}
-            </div>
+                <p className="text-white font-bold text-lg">Generating Your Report...</p>
+                <p className="text-gray-400 text-sm mt-2">Analyzing your performance across all questions</p>
+              </Card>
+            )}
+
+            {/* Transcript */}
+            {phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
+              <TranscriptPanel
+                liveTranscript={liveTranscript}
+                finalTranscript={finalTranscript}
+                isRecording={isRecording}
+              />
+            )}
+
+            {/* Audio Player for recorded speech */}
+            {audioUrl && phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
+              <div className="bg-dark-700/60 border border-white/8 rounded-2xl p-4 flex flex-col gap-2 animate-slide-up">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Speech Recording</span>
+                <audio src={audioUrl} controls className="w-full mt-1 accent-primary-600 rounded-lg" />
+              </div>
+            )}
+
+            {/* Recording Controls */}
+            {phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
+              <div className="mt-auto pt-2">
+                {phase === INTERVIEW_PHASES.RECORDING && !transcribing && (
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-gray-500">Answer timer: {answerFormatted}</span>
+                  </div>
+                )}
+                {transcribing ? (
+                  <Card className="p-4 flex items-center justify-center gap-3 border border-white/15 bg-primary-600/5 text-primary-300">
+                    <Loader2 size={18} className="animate-spin text-primary-500" />
+                    <span className="text-sm font-semibold">Transcribing audio using AI...</span>
+                  </Card>
+                ) : (
+                  <RecordingControls
+                    isRecording={isRecording}
+                    hasTranscript={!!(finalTranscript || liveTranscript)}
+                    onStart={startRecording}
+                    onStop={stopRecording}
+                    onReRecord={handleReRecord}
+                    onSubmit={handleSubmitAnswer}
+                    submitting={submitting}
+                    disabled={(phase !== INTERVIEW_PHASES.RECORDING && phase !== INTERVIEW_PHASES.QUESTION) || submitting}
+                    phase={phase}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Loading Next Question */}
+            {loadingNext && (
+              <Card className="p-6 text-center animate-pulse">
+                <div className="w-16 h-16 bg-primary-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+                <p className="text-white font-bold text-lg">Loading Next Question...</p>
+                <p className="text-gray-400 text-sm mt-2">Generating and fetching the next AI question</p>
+              </Card>
+            )}
           </div>
         </div>
 
-        {/* Right: Question + Recording */}
-        <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
-          {/* Current Question */}
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                {followUpCount > 0 ? `Follow-Up ${followUpCount}` : `Question ${questionNumber}`}
-              </span>
-              {followUpCount > 0 && (
-                <Badge variant="warning">Follow-up</Badge>
-              )}
-            </div>
-            <p className="text-white text-base sm:text-lg font-medium leading-relaxed">
-              {currentQuestion || 'Loading question...'}
-            </p>
-          </Card>
-
-          {/* Phase: ENDING */}
-          {phase === INTERVIEW_PHASES.ENDING && (
-            <Card className="p-6 text-center">
-              <div className="w-16 h-16 bg-primary-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-              </div>
-              <p className="text-white font-bold text-lg">Generating Your Report...</p>
-              <p className="text-gray-400 text-sm mt-2">Analyzing your performance across all questions</p>
-            </Card>
-          )}
-
-          {/* Transcript */}
-          {phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
-            <TranscriptPanel
-              liveTranscript={liveTranscript}
-              finalTranscript={finalTranscript}
-              isRecording={isRecording}
-            />
-          )}
-
-          {/* Audio Player for recorded speech */}
-          {audioUrl && phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
-            <div className="bg-dark-700/60 border border-white/8 rounded-2xl p-4 flex flex-col gap-2 animate-slide-up">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Speech Recording</span>
-              <audio src={audioUrl} controls className="w-full mt-1 accent-primary-600 rounded-lg" />
-            </div>
-          )}
-
-          {/* Recording Controls */}
-          {phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
-            <div className="mt-auto pt-2">
-              {phase === INTERVIEW_PHASES.RECORDING && !transcribing && (
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-gray-500">Answer timer: {answerFormatted}</span>
-                </div>
-              )}
-              {transcribing ? (
-                <Card className="p-4 flex items-center justify-center gap-3 border border-white/15 bg-primary-600/5 text-primary-300">
-                  <Loader2 size={18} className="animate-spin text-primary-500" />
-                  <span className="text-sm font-semibold">Transcribing audio using AI...</span>
-                </Card>
-              ) : (
-                <RecordingControls
-                  isRecording={isRecording}
-                  hasTranscript={!!(finalTranscript || liveTranscript)}
-                  onStart={startRecording}
-                  onStop={stopRecording}
-                  onReRecord={handleReRecord}
-                  onSubmit={handleSubmitAnswer}
-                  submitting={submitting}
-                  disabled={phase !== INTERVIEW_PHASES.RECORDING || submitting}
-                  phase={phase}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Feedback Panel */}
-          {phase === INTERVIEW_PHASES.FEEDBACK && lastFeedback && !loadingNext && (
+        {/* Row 2 — full width feedback panel */}
+        {phase === INTERVIEW_PHASES.FEEDBACK && lastFeedback && !loadingNext && (
+          <div className="w-full animate-slide-up">
             <FeedbackPanel
               feedback={lastFeedback}
               onNext={handleNext}
@@ -622,31 +644,8 @@ export default function InterviewPage() {
                   : 'Next Question'
               }
             />
-          )}
-
-          {/* Loading Next Question */}
-          {loadingNext && (
-            <Card className="p-6 text-center animate-pulse">
-              <div className="w-16 h-16 bg-primary-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-              </div>
-              <p className="text-white font-bold text-lg">Loading Next Question...</p>
-              <p className="text-gray-400 text-sm mt-2">Generating and fetching the next AI question</p>
-            </Card>
-          )}
-
-          {/* End Interview button */}
-          {phase === INTERVIEW_PHASES.RECORDING && questionLog.length > 0 && (
-            <div className="flex justify-end mt-2">
-              <button
-                onClick={() => setExitConfirm(true)}
-                className="text-xs text-gray-500 hover:text-white transition-colors"
-              >
-                End Interview Early
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Exit Confirmation Modal */}
