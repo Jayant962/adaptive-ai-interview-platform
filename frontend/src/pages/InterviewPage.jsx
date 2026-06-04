@@ -62,6 +62,27 @@ export default function InterviewPage() {
     }
   }, [sessionId])
 
+  const speakQuestion = useCallback((text) => {
+    if (muted) {
+      setPhase(INTERVIEW_PHASES.RECORDING)
+      setAvatarState(AVATAR_STATES.LISTENING)
+      return
+    }
+    setPhase(INTERVIEW_PHASES.QUESTION)
+    setAvatarState(AVATAR_STATES.SPEAKING)
+    speakText(text, {
+      rate: 0.92,
+      onEnd: () => {
+        setPhase(INTERVIEW_PHASES.RECORDING)
+        setAvatarState(AVATAR_STATES.LISTENING)
+      },
+      onError: () => {
+        setPhase(INTERVIEW_PHASES.RECORDING)
+        setAvatarState(AVATAR_STATES.LISTENING)
+      }
+    })
+  }, [muted, setPhase, setAvatarState])
+
   // Load voices and speak first question on mount
   useEffect(() => {
     if (!currentQuestion || !sessionId) return
@@ -103,28 +124,7 @@ export default function InterviewPage() {
         mediaStreamRef.current = null
       }
     }
-  }, [currentQuestion, sessionId, speakQuestion])
-
-  const speakQuestion = useCallback((text) => {
-    if (muted) {
-      setPhase(INTERVIEW_PHASES.RECORDING)
-      setAvatarState(AVATAR_STATES.LISTENING)
-      return
-    }
-    setPhase(INTERVIEW_PHASES.QUESTION)
-    setAvatarState(AVATAR_STATES.SPEAKING)
-    speakText(text, {
-      rate: 0.92,
-      onEnd: () => {
-        setPhase(INTERVIEW_PHASES.RECORDING)
-        setAvatarState(AVATAR_STATES.LISTENING)
-      },
-      onError: () => {
-        setPhase(INTERVIEW_PHASES.RECORDING)
-        setAvatarState(AVATAR_STATES.LISTENING)
-      }
-    })
-  }, [muted])
+  }, [currentQuestion, sessionId, speakQuestion, setPhase])
 
   const startRecording = useCallback(() => {
     if (!isSpeechRecognitionSupported()) {
@@ -225,7 +225,7 @@ export default function InterviewPage() {
           startRecognition(recognitionRef.current)
         })
     }
-  }, [resetAnswerTimer, isMobileDevice])
+  }, [resetAnswerTimer, isMobileDevice, setFinalTranscript, setLiveTranscript, setAudioUrl, setIsRecording, setAvatarState])
 
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false
@@ -244,7 +244,7 @@ export default function InterviewPage() {
       }
       mediaStreamRef.current = null
     }
-  }, [])
+  }, [setIsRecording, setAvatarState])
 
   const handleReRecord = useCallback(() => {
     setFinalTranscript('')
@@ -252,7 +252,20 @@ export default function InterviewPage() {
     setAudioUrl(null)
     stopSpeaking()
     accumulatedTranscriptRef.current = ''
-  }, [])
+  }, [setFinalTranscript, setLiveTranscript, setAudioUrl])
+
+  const handleEndInterview = useCallback(async () => {
+    setPhase(INTERVIEW_PHASES.ENDING)
+    setAvatarState(AVATAR_STATES.THINKING)
+    try {
+      const token = await getAuthToken()
+      await endInterview(token, sessionId)
+      navigate(`/reports/${sessionId}`)
+    } catch (err) {
+      console.error('End interview error:', err)
+      navigate(`/reports/${sessionId}`)
+    }
+  }, [sessionId, navigate, getAuthToken, setPhase, setAvatarState])
 
   const handleSubmitAnswer = useCallback(async () => {
     const transcript = finalTranscript || liveTranscript
@@ -316,7 +329,7 @@ export default function InterviewPage() {
     } finally {
       setSubmitting(false)
     }
-  }, [finalTranscript, liveTranscript, sessionId, currentQuestionId, followUpCount, canFollowUp])
+  }, [finalTranscript, liveTranscript, sessionId, currentQuestionId, followUpCount, canFollowUp, getAuthToken, setPhase, setAvatarState, setFeedback, currentQuestion, interview])
 
   const handleNext = useCallback(async () => {
     const token = await getAuthToken()
@@ -363,20 +376,7 @@ export default function InterviewPage() {
     } finally {
       setLoadingNext(false)
     }
-  }, [sessionId, speakQuestion, setAudioUrl, setPhase])
-
-  const handleEndInterview = useCallback(async () => {
-    setPhase(INTERVIEW_PHASES.ENDING)
-    setAvatarState(AVATAR_STATES.THINKING)
-    try {
-      const token = await getAuthToken()
-      await endInterview(token, sessionId)
-      navigate(`/reports/${sessionId}`)
-    } catch (err) {
-      console.error('End interview error:', err)
-      navigate(`/reports/${sessionId}`)
-    }
-  }, [sessionId, navigate])
+  }, [sessionId, speakQuestion, setAudioUrl, setFeedback, interview, setFollowUp, setFinalTranscript, setLiveTranscript, setAvatarState, handleEndInterview, setQuestion, getAuthToken])
 
   const handleExit = () => {
     stopSpeaking()
