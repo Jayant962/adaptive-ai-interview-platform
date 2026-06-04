@@ -31,7 +31,13 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
     def get_allowed_origins(self) -> list[str]:
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        origins = []
+        for origin in self.ALLOWED_ORIGINS.split(","):
+            clean = origin.strip()
+            if clean.endswith("/"):
+                clean = clean[:-1]
+            origins.append(clean)
+        return origins
 
 
 @lru_cache()
