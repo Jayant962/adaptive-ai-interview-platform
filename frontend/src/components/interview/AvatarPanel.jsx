@@ -4,6 +4,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { AVATAR_STATES } from '../../context/InterviewContext'
 import { clsx } from 'clsx'
+import { getSpeechVolume } from '../../services/speech'
 
 const STATE_CONFIG = {
   [AVATAR_STATES.IDLE]: {
@@ -65,22 +66,30 @@ function CameraController({ modelScene, onSetupComplete }) {
   useEffect(() => {
     if (!modelScene) return
 
-    // Calculate model bounds
-    const box = new THREE.Box3().setFromObject(modelScene)
-    const size = box.getSize(new THREE.Vector3())
-    const center = box.getCenter(new THREE.Vector3())
+    // Find the head bone to get a stable, locked reference height
+    let headBone = null
+    modelScene.traverse((child) => {
+      if (child.isBone && child.name.toLowerCase().includes('head')) {
+        headBone = child
+      }
+    })
 
-    // Frame the upper body (head, shoulders, chest)
-    // Eye level is slightly below top of the head
-    const eyeLevelY = box.max.y - size.y * 0.08
+    const headPos = new THREE.Vector3()
+    if (headBone) {
+      headBone.getWorldPosition(headPos)
+    } else {
+      const box = new THREE.Box3().setFromObject(modelScene)
+      const size = box.getSize(new THREE.Vector3())
+      headPos.y = box.max.y - size.y * 0.08
+    }
+
+    // Fully stable and locked camera: portrait view framing from chest to head
+    const cameraY = headPos.y - 0.06
+    const cameraZ = 0.58
+    camera.position.set(0, cameraY, cameraZ)
     
-    // Zoom in closer to capture only head, shoulders, and chest (excluding lower body/hips)
-    const cameraDistance = size.y * 0.27
-    
-    camera.position.set(0, eyeLevelY, cameraDistance)
-    
-    // Look at center of upper body (slightly below eye level, around neck/upper chest)
-    const lookAtTarget = new THREE.Vector3(0, eyeLevelY - size.y * 0.04, 0)
+    // Look at center of upper chest / neck area to keep avatar perfectly centered
+    const lookAtTarget = new THREE.Vector3(0, headPos.y - 0.14, 0)
     camera.lookAt(lookAtTarget)
     camera.updateProjectionMatrix()
 
@@ -98,6 +107,8 @@ function AvatarModel({ avatarState, onModelLoaded }) {
   const headRef = useRef()
   const neckRef = useRef()
   const spineRef = useRef()
+  const leftShoulderRef = useRef()
+  const rightShoulderRef = useRef()
   const leftArmRef = useRef()
   const rightArmRef = useRef()
   const leftForeArmRef = useRef()
@@ -114,11 +125,39 @@ function AvatarModel({ avatarState, onModelLoaded }) {
 
     const meshes = []
     scene.traverse((child) => {
+      // Improve material shading, reflections, and skin realism on load
+      if (child.isMesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+        
+        if (child.material) {
+          child.material.color.space = THREE.SRGBColorSpace
+          const matName = child.material.name.toLowerCase()
+          
+          if (matName.includes('skin') || matName.includes('face') || matName.includes('head') || matName.includes('body')) {
+            child.material.roughness = 0.70 // Soft skin reflection, not sweaty
+            child.material.metalness = 0.0
+            child.material.envMapIntensity = 1.0
+          } else if (matName.includes('hair')) {
+            child.material.roughness = 0.90 // Matte, soft hair edges
+            child.material.metalness = 0.0
+          } else if (matName.includes('eye')) {
+            child.material.roughness = 0.12 // Clear, glassy reflections for eyes
+            child.material.metalness = 0.0
+          } else if (matName.includes('teeth') || matName.includes('mouth')) {
+            child.material.roughness = 0.35
+            child.material.metalness = 0.0
+          }
+        }
+      }
+
       if (child.isBone) {
         const name = child.name.toLowerCase()
         if (name.includes('head')) headRef.current = child
         if (name.includes('neck')) neckRef.current = child
         if (name.includes('spine') && !spineRef.current) spineRef.current = child
+        if (name.includes('leftshoulder')) leftShoulderRef.current = child
+        if (name.includes('rightshoulder')) rightShoulderRef.current = child
         if (name === 'leftarm') leftArmRef.current = child
         if (name === 'rightarm') rightArmRef.current = child
         if (name === 'leftforearm') leftForeArmRef.current = child
@@ -126,14 +165,20 @@ function AvatarModel({ avatarState, onModelLoaded }) {
         if (name === 'lefteye') leftEyeRef.current = child
         if (name === 'righteye') rightEyeRef.current = child
       }
+
       if (child.isSkinnedMesh && child.morphTargetInfluences && child.morphTargetDictionary) {
         meshes.push(child)
       }
     })
     setSkinnedMeshes(meshes)
 
-    // Position arms in a natural resting pose immediately so that CameraController
-    // computes the bounding box with the arms down instead of extended.
+    // Set stable symmetrical resting pose for shoulders and arms
+    if (leftShoulderRef.current) {
+      leftShoulderRef.current.rotation.set(0, 0, 0)
+    }
+    if (rightShoulderRef.current) {
+      rightShoulderRef.current.rotation.set(0, 0, 0)
+    }
     if (leftArmRef.current) {
       leftArmRef.current.rotation.set(-2.554, 1.387, -2.151)
     }
@@ -141,7 +186,7 @@ function AvatarModel({ avatarState, onModelLoaded }) {
       rightArmRef.current.rotation.set(-2.554, -1.387, 2.151)
     }
 
-    // Center model horizontally and vertically at base
+    // Center model base
     const box = new THREE.Box3().setFromObject(scene)
     const center = box.getCenter(new THREE.Vector3())
     scene.position.x = -center.x
@@ -159,30 +204,41 @@ function AvatarModel({ avatarState, onModelLoaded }) {
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime()
 
-    // 1. Breathing & posture: subtle body movement
+    // 1. Stable Torso & Upright posture (locks drifting, swaying, floating)
     if (spineRef.current) {
-      spineRef.current.rotation.x = Math.sin(time * 1.2) * 0.005
+      // Settle down breathing movement to a subtle, imperceptible level
+      spineRef.current.rotation.x = Math.sin(time * 0.8) * 0.0012
+      spineRef.current.rotation.y = 0
+      spineRef.current.rotation.z = 0
     }
     if (neckRef.current) {
-      neckRef.current.rotation.y = Math.sin(time * 0.8) * 0.008
-      neckRef.current.rotation.x = Math.sin(time * 0.6) * 0.005
+      // Remove horizontal neck swaying
+      neckRef.current.rotation.x = Math.sin(time * 0.6) * 0.0008
+      neckRef.current.rotation.y = 0
+      neckRef.current.rotation.z = 0
     }
 
-    // Subtle breathing posture animation for the arms
+    // Lock shoulder and arm positions in resting pose
+    if (leftShoulderRef.current) {
+      leftShoulderRef.current.rotation.set(0, 0, 0)
+    }
+    if (rightShoulderRef.current) {
+      rightShoulderRef.current.rotation.set(0, 0, 0)
+    }
     if (leftArmRef.current) {
-      leftArmRef.current.rotation.set(-2.554, 1.387, -2.151 + Math.sin(time * 1.2) * 0.008)
+      leftArmRef.current.rotation.set(-2.554, 1.387, -2.151)
     }
     if (rightArmRef.current) {
-      rightArmRef.current.rotation.set(-2.554, -1.387, 2.151 - Math.sin(time * 1.2) * 0.008)
+      rightArmRef.current.rotation.set(-2.554, -1.387, 2.151)
     }
 
-    // Saccadic eye movements (tiny random shifts for realistic gaze)
+    // 2. Direct Eye Contact (extremely tiny saccades to look alive without wandering)
     saccadeTimerRef.current += delta
-    if (saccadeTimerRef.current > 1.5 + Math.random() * 2) {
+    if (saccadeTimerRef.current > 2.5 + Math.random() * 3.5) {
       saccadeTimerRef.current = 0
-      if (Math.random() > 0.4) {
-        eyeTargetRotXRef.current = (Math.random() - 0.5) * 0.025
-        eyeTargetRotYRef.current = (Math.random() - 0.5) * 0.035
+      if (Math.random() > 0.75) {
+        eyeTargetRotXRef.current = (Math.random() - 0.5) * 0.003
+        eyeTargetRotYRef.current = (Math.random() - 0.5) * 0.004
       } else {
         eyeTargetRotXRef.current = 0
         eyeTargetRotYRef.current = 0
@@ -197,26 +253,29 @@ function AvatarModel({ avatarState, onModelLoaded }) {
       rightEyeRef.current.rotation.y = THREE.MathUtils.lerp(rightEyeRef.current.rotation.y, eyeTargetRotYRef.current, 0.1)
     }
 
-    // Adjust head angle based on avatar state (Listening nod, Thinking look-away, Idle micro-movements)
+    // Natural, micro head movements (Conversational nods, tiny idle shifts)
     if (headRef.current) {
       if (avatarState === AVATAR_STATES.LISTENING) {
-        headRef.current.rotation.z = Math.sin(time * 0.8) * 0.01 + 0.015
-        headRef.current.rotation.x = Math.sin(time * 1.5) * 0.01 + 0.02
-        headRef.current.rotation.y = Math.sin(time * 0.5) * 0.005
+        // Subtle, responsive listening nod:
+        headRef.current.rotation.x = 0.015 + Math.sin(time * 1.6) * 0.003
+        headRef.current.rotation.y = 0
+        headRef.current.rotation.z = 0
       } else if (avatarState === AVATAR_STATES.THINKING) {
-        headRef.current.rotation.x = 0.08 + Math.sin(time * 0.5) * 0.008
-        headRef.current.rotation.y = -0.06 + Math.sin(time * 0.3) * 0.005
-        headRef.current.rotation.z = -0.01
+        // Natural tilted thinking posture:
+        headRef.current.rotation.x = 0.025 + Math.sin(time * 0.4) * 0.001
+        headRef.current.rotation.y = -0.015 + Math.sin(time * 0.3) * 0.0008
+        headRef.current.rotation.z = -0.004
       } else {
-        headRef.current.rotation.x = Math.sin(time * 0.9) * 0.006
-        headRef.current.rotation.y = Math.sin(time * 0.7) * 0.008
+        // Idle micro-movements:
+        headRef.current.rotation.x = Math.sin(time * 0.35) * 0.001
+        headRef.current.rotation.y = Math.sin(time * 0.25) * 0.0015
         headRef.current.rotation.z = 0
       }
     }
 
-    // 2. Realistic Blinking:
+    // 3. Reduced Blinking Rate (less frequent blinking):
     blinkTimerRef.current += delta
-    if (!isBlinkingRef.current && blinkTimerRef.current > 3.5 + Math.random() * 2.5) {
+    if (!isBlinkingRef.current && blinkTimerRef.current > 7.0 + Math.random() * 5.0) {
       isBlinkingRef.current = true
       blinkTimerRef.current = 0
       blinkDurationRef.current = 0
@@ -236,30 +295,40 @@ function AvatarModel({ avatarState, onModelLoaded }) {
       }
     }
 
-    // 3. Smooth Lip Sync (mouth open speech logic):
+    // 4. Lip Sync (Speech volume mapping + natural, slow procedural fallback)
     let mouthInfluence = 0
     if (avatarState === AVATAR_STATES.SPEAKING) {
-      mouthInfluence = Math.abs(
-        Math.sin(time * 12) * 0.35 +
-        Math.sin(time * 18) * 0.25 +
-        Math.sin(time * 6) * 0.15 +
-        Math.random() * 0.15
-      )
-      mouthInfluence = Math.max(0, Math.min(0.75, mouthInfluence))
+      const liveVolume = getSpeechVolume()
+      
+      if (liveVolume > 0.02) {
+        // Map audio amplitude directly to jawOpen, capping it to prevent exaggerated cartoon open mouth
+        mouthInfluence = Math.min(0.40, liveVolume * 0.85)
+      } else {
+        // Extremely smooth, slow procedural fallback (40-50% slower than previous implementation)
+        const slowTime = time * 6.0
+        mouthInfluence = Math.abs(
+          Math.sin(slowTime) * 0.15 +
+          Math.sin(slowTime * 1.5) * 0.1 +
+          Math.sin(slowTime * 0.5) * 0.05
+        )
+        // Insert natural word pauses
+        if (mouthInfluence < 0.08) {
+          mouthInfluence = 0
+        }
+        mouthInfluence = Math.min(0.32, mouthInfluence)
+      }
     }
 
-    // Apply morph target blendshapes to all skinned meshes
+    // Apply morph targets to all meshes
     skinnedMeshes.forEach((mesh) => {
       const dict = mesh.morphTargetDictionary
       const infs = mesh.morphTargetInfluences
       if (dict && infs) {
-        // Blinking
         const leftBlink = dict['eyeBlinkLeft'] ?? dict['blink_L'] ?? dict['eyeBlink_L'] ?? dict['Blink_Left']
         const rightBlink = dict['eyeBlinkRight'] ?? dict['blink_R'] ?? dict['eyeBlink_R'] ?? dict['Blink_Right']
         if (leftBlink !== undefined) infs[leftBlink] = blinkInfluence
         if (rightBlink !== undefined) infs[rightBlink] = blinkInfluence
 
-        // Lip Sync / Speech (Jaw + mouth shape variety)
         const jawOpen = dict['jawOpen'] ?? dict['mouthOpen'] ?? dict['mouth_O'] ?? dict['mouthOpen_h'] ?? dict['Mouth_Open']
         if (jawOpen !== undefined) {
           infs[jawOpen] = mouthInfluence
@@ -267,13 +336,13 @@ function AvatarModel({ avatarState, onModelLoaded }) {
         
         const mouthFunnel = dict['mouthFunnel'] ?? dict['mouthPucker'] ?? dict['mouth_Funnel'] ?? dict['mouth_Pucker']
         if (mouthFunnel !== undefined) {
-          infs[mouthFunnel] = mouthInfluence * 0.3
+          infs[mouthFunnel] = mouthInfluence * 0.25
         }
 
-        // Friendly Smile (Subtle lift at the corners, slightly fluctuating)
+        // Friendly smile
         const smileL = dict['mouthSmileLeft'] ?? dict['mouthSmile_L'] ?? dict['Smile_Left']
         const smileR = dict['mouthSmileRight'] ?? dict['mouthSmile_R'] ?? dict['Smile_Right']
-        const smileInfluence = 0.08 + Math.sin(time * 1.5) * 0.03
+        const smileInfluence = 0.05
         if (smileL !== undefined) infs[smileL] = smileInfluence
         if (smileR !== undefined) infs[smileR] = smileInfluence
       }
@@ -326,7 +395,7 @@ export default function AvatarPanel({ avatarState = AVATAR_STATES.IDLE, avatarUr
               className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
               style={{ 
                 backgroundImage: "url('/office_background.png')",
-                filter: "brightness(0.85) contrast(1.05)"
+                filter: "brightness(0.9) contrast(1.02)"
               }}
             />
             

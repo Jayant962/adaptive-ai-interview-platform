@@ -98,9 +98,93 @@ export function abortRecognition(recognitionInstance) {
 // ─────────────────────────────────────────────
 
 let currentAudio = null
+let audioContext = null
+let analyser = null
+let dataArray = null
+let sourceNode = null
+let currentVolume = 0
+let volumeInterval = null
+
+export function getSpeechVolume() {
+  return currentVolume
+}
 
 export function isSpeechSynthesisSupported() {
   return true
+}
+
+function setupAudioAnalyzer(audioElement) {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return
+
+    if (!audioContext) {
+      audioContext = new AudioContextClass()
+    }
+
+    if (audioContext.state === 'suspended') {
+      audioContext.resume()
+    }
+
+    if (!analyser) {
+      analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      const bufferLength = analyser.frequencyBinCount
+      dataArray = new Uint8Array(bufferLength)
+    }
+
+    if (sourceNode) {
+      try {
+        sourceNode.disconnect()
+      } catch (e) {}
+    }
+
+    sourceNode = audioContext.createMediaElementSource(audioElement)
+    sourceNode.connect(analyser)
+    analyser.connect(audioContext.destination)
+
+    updateVolumeLoop()
+  } catch (e) {
+    console.warn("Failed to setup Web Audio API analyzer:", e)
+  }
+}
+
+function cleanupAudioAnalyzer() {
+  currentVolume = 0
+  if (volumeInterval) {
+    cancelAnimationFrame(volumeInterval)
+    volumeInterval = null
+  }
+}
+
+function updateVolumeLoop() {
+  if (volumeInterval) {
+    cancelAnimationFrame(volumeInterval)
+  }
+
+  const poll = () => {
+    if (!currentAudio || currentAudio.paused) {
+      currentVolume = 0
+      return
+    }
+
+    if (analyser && dataArray) {
+      analyser.getByteFrequencyData(dataArray)
+      let sum = 0
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i]
+      }
+      const average = sum / dataArray.length
+      // Scale average volume to 0.0 - 1.0 range
+      currentVolume = average / 128.0
+    } else {
+      currentVolume = 0
+    }
+
+    volumeInterval = requestAnimationFrame(poll)
+  }
+
+  poll()
 }
 
 export function speakText(text, { onStart, onEnd, onError } = {}) {
@@ -117,26 +201,31 @@ export function speakText(text, { onStart, onEnd, onError } = {}) {
   const url = `${API_URL}/api/interview/tts?text=${encodeURIComponent(text.trim())}`
 
   const audio = new Audio(url)
+  audio.crossOrigin = "anonymous"
   currentAudio = audio
 
   audio.onplay = () => {
     onStart?.()
+    setupAudioAnalyzer(audio)
   }
 
   audio.onended = () => {
     currentAudio = null
+    cleanupAudioAnalyzer()
     onEnd?.()
   }
 
   audio.onerror = (e) => {
     console.error('Edge TTS playback error:', e)
     currentAudio = null
+    cleanupAudioAnalyzer()
     onError?.(e)
   }
 
   audio.play().catch(err => {
     console.error('Audio play failed:', err)
     currentAudio = null
+    cleanupAudioAnalyzer()
     onError?.(err)
     onEnd?.() // trigger onEnd so flow doesn't get stuck if play is blocked
   })
@@ -151,6 +240,7 @@ export function stopSpeaking() {
     }
     currentAudio = null
   }
+  cleanupAudioAnalyzer()
 }
 
 export function isSpeaking() {
