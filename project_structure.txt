@@ -1,0 +1,103 @@
+AI Interview Platform - Project Folder Structure
+
+.
+├── .gitignore
+├── README.md
+├── model.glb
+├── project_structure.txt
+├── backend/
+│   ├── .env
+│   ├── .env.example
+│   ├── render.yaml
+│   ├── requirements.txt
+│   └── app/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── main.py
+│       ├── api/
+│       │   └── routes/
+│       │       ├── __init__.py
+│       │       ├── auth.py
+│       │       ├── interview.py
+│       │       └── reports.py
+│       ├── database/
+│       │   ├── __init__.py
+│       │   └── connection.py
+│       ├── ml/
+│       │   ├── __init__.py
+│       │   └── scorer.py
+│       ├── models/
+│       │   ├── __init__.py
+│       │   ├── analytics.py
+│       │   ├── answer.py
+│       │   ├── interview.py
+│       │   ├── question.py
+│       │   ├── report.py
+│       │   ├── score.py
+│       │   └── user.py
+│       ├── nlp/
+│       │   ├── __init__.py
+│       │   └── analyzer.py
+│       ├── prompts/
+│       │   ├── __init__.py
+│       │   └── interview_prompts.py
+│       ├── schemas/
+│       │   ├── __init__.py
+│       │   ├── interview.py
+│       │   ├── report.py
+│       │   └── user.py
+│       ├── services/
+│       │   ├── __init__.py
+│       │   ├── auth_service.py
+│       │   ├── groq_service.py
+│       │   └── interview_service.py
+│       └── utils/
+│           ├── auth_middleware.py
+│           └── email.py
+└── frontend/
+    ├── .env
+    ├── .env.example
+    ├── index.html
+    ├── package.json
+    ├── postcss.config.js
+    ├── tailwind.config.js
+    ├── vercel.json
+    ├── vite.config.js
+    └── src/
+        ├── App.jsx
+        ├── clerk-bridge.jsx
+        ├── index.css
+        ├── main.jsx
+        ├── components/
+        │   ├── interview/
+        │   │   ├── AvatarPanel.jsx
+        │   │   ├── FeedbackPanel.jsx
+        │   │   ├── RecordingControls.jsx
+        │   │   └── TranscriptPanel.jsx
+        │   └── ui/
+        │       └── index.jsx
+        ├── context/
+        │   ├── AuthContext.jsx
+        │   ├── InterviewContext.jsx
+        │   └── ThemeContext.jsx
+        ├── hooks/
+        │   └── useTimer.js
+        ├── layouts/
+        │   └── DashboardLayout.jsx
+        ├── pages/
+        │   ├── DashboardPage.jsx
+        │   ├── HistoryPage.jsx
+        │   ├── InterviewPage.jsx
+        │   ├── LandingPage.jsx
+        │   ├── LoginPage.jsx
+        │   ├── ProfilePage.jsx
+        │   ├── ReportPage.jsx
+        │   ├── ReportsPage.jsx
+        │   ├── SetupPage.jsx
+        │   └── SignupPage.jsx
+        ├── routes/
+        │   ├── AppRouter.jsx
+        │   └── ProtectedRoute.jsx
+        └── services/
+            ├── api.js
+            └── speech.js

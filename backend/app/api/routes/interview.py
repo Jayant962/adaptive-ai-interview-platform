@@ -8,7 +8,7 @@ POST /api/interview/end             - End interview + generate report
 GET  /api/interview/history         - Get interview history
 GET  /api/interview/{session_id}    - Get specific session
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -30,6 +30,7 @@ from app.services.interview_service import (
     end_interview_and_generate_report,
 )
 from app.utils.auth_middleware import get_current_db_user
+from app.services.groq_service import groq_client, is_mock_mode
 
 router = APIRouter(prefix="/api/interview", tags=["Interview"])
 
@@ -207,6 +208,34 @@ async def text_to_speech(text: str, voice: str = "en-US-GuyNeural"):
                 yield chunk["data"]
 
     return StreamingResponse(audio_generator(), media_type="audio/mpeg")
+
+
+@router.post("/transcribe")
+async def transcribe_audio(audio: UploadFile = File(...)):
+    """
+    Transcribe audio file (webm/ogg) using Groq Whisper API.
+    """
+    try:
+        audio_bytes = await audio.read()
+        
+        # Check if we are running in mock mode or groq client is not initialized
+        if is_mock_mode or not groq_client:
+            print("[INFO] Offline Mock Mode: returning mock transcription response.")
+            return {"transcript": "This is a mock transcription because the Groq API key is not configured or in mock mode."}
+
+        # Call Groq Whisper API
+        result = groq_client.audio.transcriptions.create(
+            file=("audio.webm", audio_bytes, "audio/webm"),
+            model="whisper-large-v3-turbo",
+            response_format="text",
+            language="en"
+        )
+        # Safely extract string whether SDK returns str or object
+        transcript_text = result if isinstance(result, str) else getattr(result, 'text', str(result))
+        return {"transcript": transcript_text}
+    except Exception as e:
+        print(f"[ERROR] Groq Whisper transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
 
 @router.get("/{session_id}")

@@ -256,3 +256,22 @@ export function isSpeaking() {
 export function loadVoices() {
   return Promise.resolve([])
 }
+
+export async function transcribeAudioBlob(blob, apiUrl) {
+  const formData = new FormData()
+  formData.append('audio', blob, 'audio.webm')
+
+  const cleanApiUrl = apiUrl.replace(/\/$/, '')
+  const response = await fetch(`${cleanApiUrl}/api/interview/transcribe`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || `Transcription failed with HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data.transcript
+}

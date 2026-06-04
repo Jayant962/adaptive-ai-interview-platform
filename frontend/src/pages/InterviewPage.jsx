@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Volume2, VolumeX, Maximize2 } from 'lucide-react'
+import { X, Volume2, VolumeX, Maximize2, Loader2 } from 'lucide-react'
 import {
   useInterview,
   AVATAR_STATES,
@@ -13,7 +13,7 @@ import {
 import {
   createSpeechRecognition, startRecognition, stopRecognition,
   abortRecognition, speakText, stopSpeaking, loadVoices,
-  isSpeechRecognitionSupported
+  isSpeechRecognitionSupported, transcribeAudioBlob
 } from '../services/speech'
 import AvatarPanel from '../components/interview/AvatarPanel'
 import RecordingControls from '../components/interview/RecordingControls'
@@ -42,6 +42,7 @@ export default function InterviewPage() {
   const [exitConfirm, setExitConfirm] = useState(false)
   const [audioUrl, setAudioUrl] = useState(null)
   const [loadingNext, setLoadingNext] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
 
   const recognitionRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -53,7 +54,7 @@ export default function InterviewPage() {
   const { seconds: totalSeconds, formatted: totalFormatted } = useTimer(true)
   const { seconds: answerSeconds, formatted: answerFormatted, reset: resetAnswerTimer } = useTimer(isRecording)
 
-  const isMobileDevice = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
 
   // Redirect if no session
   useEffect(() => {
@@ -130,10 +131,6 @@ export default function InterviewPage() {
     // 1. Ensure any active TTS is stopped to free up the audio channel
     stopSpeaking()
 
-    if (!isSpeechRecognitionSupported()) {
-      alert('Speech recognition is not supported. Please use Chrome or Edge.')
-      return
-    }
     setFinalTranscript('')
     setLiveTranscript('')
     setAudioUrl(null)
@@ -144,80 +141,132 @@ export default function InterviewPage() {
     accumulatedTranscriptRef.current = ''
     setIsRecording(true)
 
-    recognitionRef.current = createSpeechRecognition({
-      onStart: () => {
-        setAvatarState(AVATAR_STATES.LISTENING)
-      },
-      onResult: ({ final, interim }) => {
-        const currentFinal = final || ''
-        const fullFinal = (accumulatedTranscriptRef.current + ' ' + currentFinal).trim()
-        
-        if (currentFinal) {
-          setFinalTranscript(fullFinal)
-        }
-        setLiveTranscript(interim || '')
-      },
-      onEnd: (final) => {
-        if (isRecordingRef.current) {
-          // Speech recognition stopped automatically due to silence/timeout. Let's restart it!
-          if (final) {
-            accumulatedTranscriptRef.current = (accumulatedTranscriptRef.current + ' ' + final).trim()
-            setFinalTranscript(accumulatedTranscriptRef.current)
-          }
-          setLiveTranscript('')
-          
-          console.log('Speech recognition ended automatically. Restarting in 200ms...')
-          setTimeout(() => {
-            if (isRecordingRef.current && recognitionRef.current) {
-              try {
-                startRecognition(recognitionRef.current)
-              } catch (err) {
-                console.error('Failed to restart speech recognition:', err)
-              }
+    if (isMobile) {
+      // Mobile Flow: MediaRecorder + Backend Whisper Transcription
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          mediaStreamRef.current = stream
+          const mediaRecorder = new MediaRecorder(stream)
+          mediaRecorderRef.current = mediaRecorder
+          audioChunksRef.current = []
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunksRef.current.push(event.data)
             }
-          }, 200)
-        } else {
-          // Intentionally stopped
-          if (final) {
-            const fullFinal = (accumulatedTranscriptRef.current + ' ' + final).trim()
+          }
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            const url = URL.createObjectURL(audioBlob)
+            setAudioUrl(url)
+
+            stream.getTracks().forEach(track => track.stop())
+            mediaStreamRef.current = null
+
+            setTranscribing(true)
+            try {
+              const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+              const transcript = await transcribeAudioBlob(audioBlob, rawApiUrl)
+              setFinalTranscript(transcript)
+              setPhase(INTERVIEW_PHASES.RECORDING)
+              setAvatarState(AVATAR_STATES.LISTENING)
+            } catch (err) {
+              console.error('Transcription failed:', err)
+              alert('Failed to transcribe audio. Please try speaking again.')
+            } finally {
+              setTranscribing(false)
+            }
+          }
+
+          mediaRecorder.start()
+          setAvatarState(AVATAR_STATES.LISTENING)
+        })
+        .catch(err => {
+          console.error('Failed to start audio recording:', err)
+          alert('Failed to access microphone. Please ensure microphone permissions are granted.')
+          setIsRecording(false)
+          isRecordingRef.current = false
+          setAvatarState(AVATAR_STATES.IDLE)
+        })
+    } else {
+      // Desktop Flow: Web Speech API (webkitSpeechRecognition) + optional MediaRecorder
+      if (!isSpeechRecognitionSupported()) {
+        alert('Speech recognition is not supported. Please use Chrome or Edge.')
+        setIsRecording(false)
+        isRecordingRef.current = false
+        return
+      }
+
+      recognitionRef.current = createSpeechRecognition({
+        onStart: () => {
+          setAvatarState(AVATAR_STATES.LISTENING)
+        },
+        onResult: ({ final, interim }) => {
+          const currentFinal = final || ''
+          const fullFinal = (accumulatedTranscriptRef.current + ' ' + currentFinal).trim()
+          
+          if (currentFinal) {
             setFinalTranscript(fullFinal)
           }
-          setLiveTranscript('')
-          setAvatarState(AVATAR_STATES.IDLE)
-          setIsRecording(false)
-          
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop()
+          setLiveTranscript(interim || '')
+        },
+        onEnd: (final) => {
+          if (isRecordingRef.current) {
+            // Speech recognition stopped automatically due to silence/timeout. Let's restart it!
+            if (final) {
+              accumulatedTranscriptRef.current = (accumulatedTranscriptRef.current + ' ' + final).trim()
+              setFinalTranscript(accumulatedTranscriptRef.current)
+            }
+            setLiveTranscript('')
+            
+            console.log('Speech recognition ended automatically. Restarting in 200ms...')
+            setTimeout(() => {
+              if (isRecordingRef.current && recognitionRef.current) {
+                try {
+                  startRecognition(recognitionRef.current)
+                } catch (err) {
+                  console.error('Failed to restart speech recognition:', err)
+                }
+              }
+            }, 200)
+          } else {
+            // Intentionally stopped
+            if (final) {
+              const fullFinal = (accumulatedTranscriptRef.current + ' ' + final).trim()
+              setFinalTranscript(fullFinal)
+            }
+            setLiveTranscript('')
+            setAvatarState(AVATAR_STATES.IDLE)
+            setIsRecording(false)
+            
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+              mediaRecorderRef.current.stop()
+            }
           }
-        }
-      },
-      onError: (err) => {
-        console.error('Speech recognition error:', err)
-        
-        // Stop recording state for critical errors to prevent infinite crash loops
-        const criticalErrors = ['not-allowed', 'audio-capture', 'service-not-allowed', 'network']
-        if (criticalErrors.includes(err)) {
-          isRecordingRef.current = false
-          setIsRecording(false)
-          setAvatarState(AVATAR_STATES.IDLE)
+        },
+        onError: (err) => {
+          console.error('Speech recognition error:', err)
           
-          let errMsg = `Speech recognition error: ${err}`
-          if (err === 'not-allowed') {
-            errMsg = 'Microphone permission was denied, or the page is not running over a secure connection (HTTPS). On mobile devices, browsers restrict microphone access and speech APIs to secure origins (HTTPS/localhost). Please enable permissions and use HTTPS.'
-          } else if (err === 'audio-capture') {
-            errMsg = 'Could not access your microphone. Please check if another application or browser tab is using it.'
-          } else if (err === 'network') {
-            errMsg = 'Network connection lost. Speech recognition requires an active internet connection.'
+          const criticalErrors = ['not-allowed', 'audio-capture', 'service-not-allowed', 'network']
+          if (criticalErrors.includes(err)) {
+            isRecordingRef.current = false
+            setIsRecording(false)
+            setAvatarState(AVATAR_STATES.IDLE)
+            
+            let errMsg = `Speech recognition error: ${err}`
+            if (err === 'not-allowed') {
+              errMsg = 'Microphone permission was denied, or the page is not running over a secure connection (HTTPS). On mobile devices, browsers restrict microphone access and speech APIs to secure origins (HTTPS/localhost). Please enable permissions and use HTTPS.'
+            } else if (err === 'audio-capture') {
+              errMsg = 'Could not access your microphone. Please check if another application or browser tab is using it.'
+            } else if (err === 'network') {
+              errMsg = 'Network connection lost. Speech recognition requires an active internet connection.'
+            }
+            alert(errMsg)
           }
-          alert(errMsg)
-        }
-      },
-    })
+        },
+      })
 
-    if (isMobileDevice) {
-      // Bypass getUserMedia / MediaRecorder on mobile to avoid microphone sharing/locking conflicts
-      startRecognition(recognitionRef.current)
-    } else {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
           mediaStreamRef.current = stream
@@ -247,26 +296,32 @@ export default function InterviewPage() {
           startRecognition(recognitionRef.current)
         })
     }
-  }, [resetAnswerTimer, isMobileDevice, setFinalTranscript, setLiveTranscript, setAudioUrl, setIsRecording, setAvatarState])
+  }, [resetAnswerTimer, isMobile, setFinalTranscript, setLiveTranscript, setAudioUrl, setIsRecording, setAvatarState])
 
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false
     setIsRecording(false)
     setAvatarState(AVATAR_STATES.IDLE)
     
-    stopRecognition(recognitionRef.current)
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
-    }
-    if (mediaStreamRef.current) {
-      try {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop())
-      } catch (e) {
-        console.error(e)
+    if (isMobile) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
       }
-      mediaStreamRef.current = null
+    } else {
+      stopRecognition(recognitionRef.current)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        } catch (e) {
+          console.error(e)
+        }
+        mediaStreamRef.current = null
+      }
     }
-  }, [setIsRecording, setAvatarState])
+  }, [setIsRecording, setAvatarState, isMobile])
 
   const handleReRecord = useCallback(() => {
     setFinalTranscript('')
@@ -407,6 +462,10 @@ export default function InterviewPage() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current = null
+    }
     resetInterview()
     navigate('/dashboard')
   }
@@ -524,22 +583,29 @@ export default function InterviewPage() {
           {/* Recording Controls */}
           {phase !== INTERVIEW_PHASES.ENDING && !loadingNext && (
             <div className="mt-auto pt-2">
-              {phase === INTERVIEW_PHASES.RECORDING && (
+              {phase === INTERVIEW_PHASES.RECORDING && !transcribing && (
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs text-gray-500">Answer timer: {answerFormatted}</span>
                 </div>
               )}
-              <RecordingControls
-                isRecording={isRecording}
-                hasTranscript={!!(finalTranscript || liveTranscript)}
-                onStart={startRecording}
-                onStop={stopRecording}
-                onReRecord={handleReRecord}
-                onSubmit={handleSubmitAnswer}
-                submitting={submitting}
-                disabled={phase !== INTERVIEW_PHASES.RECORDING || submitting}
-                phase={phase}
-              />
+              {transcribing ? (
+                <Card className="p-4 flex items-center justify-center gap-3 border border-white/15 bg-primary-600/5 text-primary-300">
+                  <Loader2 size={18} className="animate-spin text-primary-500" />
+                  <span className="text-sm font-semibold">Transcribing audio using AI...</span>
+                </Card>
+              ) : (
+                <RecordingControls
+                  isRecording={isRecording}
+                  hasTranscript={!!(finalTranscript || liveTranscript)}
+                  onStart={startRecording}
+                  onStop={stopRecording}
+                  onReRecord={handleReRecord}
+                  onSubmit={handleSubmitAnswer}
+                  submitting={submitting}
+                  disabled={phase !== INTERVIEW_PHASES.RECORDING || submitting}
+                  phase={phase}
+                />
+              )}
             </div>
           )}
 
