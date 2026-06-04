@@ -97,73 +97,67 @@ export function abortRecognition(recognitionInstance) {
 // SPEECH SYNTHESIS (Text-to-Speech)
 // ─────────────────────────────────────────────
 
-let currentUtterance = null
+let currentAudio = null
 
 export function isSpeechSynthesisSupported() {
-  return 'speechSynthesis' in window
+  return true
 }
 
-export function speakText(text, { onStart, onEnd, onError, rate = 0.95, pitch = 1.0 } = {}) {
-  if (!isSpeechSynthesisSupported()) {
-    onError?.('Speech synthesis not supported')
-    return
-  }
-
+export function speakText(text, { onStart, onEnd, onError } = {}) {
   // Cancel any current speech
   stopSpeaking()
 
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.rate = rate
-  utterance.pitch = pitch
-  utterance.volume = 1.0
-  utterance.lang = 'en-US'
-
-  // Try to use a natural-sounding voice
-  const voices = window.speechSynthesis.getVoices()
-  const preferredVoice = voices.find(v =>
-    v.name.includes('Google US English') ||
-    v.name.includes('Microsoft Zira') ||
-    v.name.includes('Samantha') ||
-    (v.lang === 'en-US' && !v.name.includes('novelty'))
-  )
-  if (preferredVoice) {
-    utterance.voice = preferredVoice
+  if (!text || !text.trim()) {
+    onError?.('No text provided')
+    return
   }
 
-  utterance.onstart = () => onStart?.()
-  utterance.onend = () => {
-    currentUtterance = null
+  const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const API_URL = rawApiUrl.replace(/\/$/, '')
+  const url = `${API_URL}/api/interview/tts?text=${encodeURIComponent(text.trim())}`
+
+  const audio = new Audio(url)
+  currentAudio = audio
+
+  audio.onplay = () => {
+    onStart?.()
+  }
+
+  audio.onended = () => {
+    currentAudio = null
     onEnd?.()
   }
-  utterance.onerror = (e) => {
-    if (e.error !== 'interrupted') onError?.(e.error)
+
+  audio.onerror = (e) => {
+    console.error('Edge TTS playback error:', e)
+    currentAudio = null
+    onError?.(e)
   }
 
-  currentUtterance = utterance
-  window.speechSynthesis.speak(utterance)
+  audio.play().catch(err => {
+    console.error('Audio play failed:', err)
+    currentAudio = null
+    onError?.(err)
+    onEnd?.() // trigger onEnd so flow doesn't get stuck if play is blocked
+  })
 }
 
 export function stopSpeaking() {
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel()
+  if (currentAudio) {
+    try {
+      currentAudio.pause()
+    } catch (e) {
+      console.error('Error pausing audio:', e)
+    }
+    currentAudio = null
   }
-  currentUtterance = null
 }
 
 export function isSpeaking() {
-  return window.speechSynthesis?.speaking ?? false
+  return currentAudio !== null && !currentAudio.paused
 }
 
-// Preload voices (some browsers need this)
+// Preload voices (legacy fallback - resolve instantly)
 export function loadVoices() {
-  return new Promise((resolve) => {
-    const voices = window.speechSynthesis?.getVoices()
-    if (voices && voices.length > 0) {
-      resolve(voices)
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => {
-        resolve(window.speechSynthesis.getVoices())
-      }
-    }
-  })
+  return Promise.resolve([])
 }

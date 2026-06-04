@@ -45,12 +45,15 @@ export default function InterviewPage() {
 
   const recognitionRef = useRef(null)
   const mediaRecorderRef = useRef(null)
+  const mediaStreamRef = useRef(null)
   const audioChunksRef = useRef([])
   const answerStartTime = useRef(null)
   const isRecordingRef = useRef(false)
   const accumulatedTranscriptRef = useRef('')
   const { seconds: totalSeconds, formatted: totalFormatted } = useTimer(true)
   const { seconds: answerSeconds, formatted: answerFormatted, reset: resetAnswerTimer } = useTimer(isRecording)
+
+  const isMobileDevice = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
 
   // Redirect if no session
   useEffect(() => {
@@ -66,7 +69,41 @@ export default function InterviewPage() {
       setPhase(INTERVIEW_PHASES.QUESTION)
       speakQuestion(currentQuestion)
     })
-  }, [])
+
+    return () => {
+      // Clean up TTS audio
+      stopSpeaking()
+      isRecordingRef.current = false
+      
+      // Clean up speech recognition
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort()
+        } catch (e) {
+          console.error('Error aborting speech recognition during unmount:', e)
+        }
+      }
+
+      // Clean up media recorder
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop()
+        } catch (e) {
+          console.error('Error stopping media recorder during unmount:', e)
+        }
+      }
+
+      // Stop all tracks of active mic stream to release mic icon
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        } catch (e) {
+          console.error('Error stopping media stream tracks during unmount:', e)
+        }
+        mediaStreamRef.current = null
+      }
+    }
+  }, [currentQuestion, sessionId, speakQuestion])
 
   const speakQuestion = useCallback((text) => {
     if (muted) {
@@ -155,33 +192,40 @@ export default function InterviewPage() {
       },
     })
 
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(stream => {
-        const mediaRecorder = new MediaRecorder(stream)
-        mediaRecorderRef.current = mediaRecorder
-        audioChunksRef.current = []
+    if (isMobileDevice) {
+      // Bypass getUserMedia / MediaRecorder on mobile to avoid microphone sharing/locking conflicts
+      startRecognition(recognitionRef.current)
+    } else {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          mediaStreamRef.current = stream
+          const mediaRecorder = new MediaRecorder(stream)
+          mediaRecorderRef.current = mediaRecorder
+          audioChunksRef.current = []
 
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data)
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunksRef.current.push(event.data)
+            }
           }
-        }
 
-        mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-          const url = URL.createObjectURL(audioBlob)
-          setAudioUrl(url)
-          stream.getTracks().forEach(track => track.stop())
-        }
+          mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            const url = URL.createObjectURL(audioBlob)
+            setAudioUrl(url)
+            stream.getTracks().forEach(track => track.stop())
+            mediaStreamRef.current = null
+          }
 
-        mediaRecorder.start()
-        startRecognition(recognitionRef.current)
-      })
-      .catch(err => {
-        console.error('Failed to start audio recording:', err)
-        startRecognition(recognitionRef.current)
-      })
-  }, [resetAnswerTimer])
+          mediaRecorder.start()
+          startRecognition(recognitionRef.current)
+        })
+        .catch(err => {
+          console.error('Failed to start audio recording:', err)
+          startRecognition(recognitionRef.current)
+        })
+    }
+  }, [resetAnswerTimer, isMobileDevice])
 
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false
@@ -191,6 +235,14 @@ export default function InterviewPage() {
     stopRecognition(recognitionRef.current)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      } catch (e) {
+        console.error(e)
+      }
+      mediaStreamRef.current = null
     }
   }, [])
 

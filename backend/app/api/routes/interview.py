@@ -9,8 +9,10 @@ GET  /api/interview/history         - Get interview history
 GET  /api/interview/{session_id}    - Get specific session
 """
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import edge_tts
 
 from app.database.connection import get_db
 from app.models.user import User
@@ -187,6 +189,24 @@ async def get_history(
     ).offset(offset).limit(limit).all()
 
     return sessions
+
+
+@router.get("/tts")
+async def text_to_speech(text: str, voice: str = "en-US-GuyNeural"):
+    """
+    Generate TTS audio for the given text using Microsoft Edge TTS (male voice).
+    """
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Text parameter is required")
+
+    async def audio_generator():
+        # en-US-GuyNeural is the standard high-quality Microsoft Edge male voice
+        communicate = edge_tts.Communicate(text, voice)
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                yield chunk["data"]
+
+    return StreamingResponse(audio_generator(), media_type="audio/mpeg")
 
 
 @router.get("/{session_id}")
