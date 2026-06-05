@@ -14,10 +14,14 @@ function scoreColor(s) {
 }
 
 export default function HistoryPage() {
-  const { history: sessions, historyLoading: loading } = useDataContext()
+  const { history, historyLoading: loading } = useDataContext()
+  const sessions = history ?? []   // guard against null (DataContext starts as [])
   const [search, setSearch] = useState('')
   const [filterDifficulty, setFilterDifficulty] = useState('all')
   const [sortBy, setSortBy] = useState('date')
+
+  // Show loading spinner BEFORE any array operations to avoid null crashes
+  if (loading) return <PageLoader message="Loading interview history..." />
 
   // Filter + sort
   const filtered = sessions
@@ -32,7 +36,6 @@ export default function HistoryPage() {
       return 0
     })
 
-  if (loading) return <PageLoader message="Loading interview history..." />
 
   return (
     <DashboardLayout>
@@ -74,11 +77,10 @@ export default function HistoryPage() {
                 <button
                   key={d}
                   onClick={() => setFilterDifficulty(d)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize ${
-                    filterDifficulty === d
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize ${filterDifficulty === d
                       ? 'bg-primary-600 text-white'
                       : 'bg-dark-600 text-gray-400 hover:text-white border border-white/10'
-                  }`}
+                    }`}
                 >
                   {d === 'all' ? 'All' : d}
                 </button>

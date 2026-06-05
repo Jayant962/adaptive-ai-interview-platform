@@ -42,7 +42,7 @@ export default function SignupPage() {
                 footerActionLink: 'text-primary-400',
               }
             }}
-            redirectUrl="/dashboard"
+            redirectUrl="/interview/setup"
             signInUrl="/login"
           />
         </div>

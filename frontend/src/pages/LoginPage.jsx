@@ -77,7 +77,7 @@ export default function LoginPage() {
                 footerActionLink: 'text-primary-400',
               }
             }}
-            redirectUrl="/dashboard"
+            redirectUrl="/interview/setup"
             signUpUrl="/signup"
           />
         </div>

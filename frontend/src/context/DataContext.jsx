@@ -18,8 +18,9 @@ export function DataProvider({ children }) {
   const { syncComplete, isSignedIn, getAuthToken } = useAuthContext()
 
   // ── Cached data ────────────────────────────────────────────────────────────
+  // Note: history must start as [] (not null) so HistoryPage's .filter() never crashes.
   const [analytics, setAnalytics]           = useState(null)
-  const [history, setHistory]               = useState(null)
+  const [history, setHistory]               = useState([])
   const [overallReport, setOverallReport]   = useState(null)
 
   // ── Per-resource loading flags ─────────────────────────────────────────────
@@ -30,29 +31,57 @@ export function DataProvider({ children }) {
   // Prevent double-fetch if effect fires twice (React StrictMode)
   const prefetchedRef = useRef(false)
 
-  // ── Fetch all 3 endpoints in parallel ─────────────────────────────────────
+  // ── Preload browser assets & eager JS chunks ──────────────────────────────
+  const preloadAssets = () => {
+    // 1. Tell browser to start fetching the 14 MB avatar model immediately.
+    //    When Three.js GLTFLoader eventually runs, bytes are already in cache → instant.
+    if (!document.querySelector('link[data-preload="model-glb"]')) {
+      const link = document.createElement('link')
+      link.rel         = 'preload'
+      link.href        = '/model.glb'
+      link.as          = 'fetch'
+      link.crossOrigin = 'anonymous'
+      link.dataset.preload = 'model-glb'
+      document.head.appendChild(link)
+    }
+
+    // 2. Eagerly download all lazy page JS chunks so every navigation is instant.
+    //    Vite deduplicates — these are no-ops if the chunk is already cached.
+    import('../pages/DashboardPage').catch(() => {})
+    import('../pages/HistoryPage').catch(() => {})
+    import('../pages/ReportsPage').catch(() => {})
+    import('../pages/InterviewPage').catch(() => {})
+    import('../pages/ReportPage').catch(() => {})
+    import('../pages/ProfilePage').catch(() => {})
+    import('../pages/SetupPage').catch(() => {})
+  }
+
+  // ── Fetch all 3 API endpoints INDEPENDENTLY in parallel ──────────────────
+  // Each resolves its own loading flag the moment ITS data arrives.
+  // Pages don't wait for each other — dashboard shows as soon as analytics
+  // lands, history shows when history lands, etc.
+  const fetchIndependent = (token) => {
+    const p1 = getAnalytics(token)
+      .then(data => { setAnalytics(data);    setAnalyticsLoading(false) })
+      .catch(err => { console.warn('[DataContext] analytics failed:', err); setAnalyticsLoading(false) })
+
+    const p2 = getInterviewHistory(token, 50, 0)
+      .then(data => { setHistory(data);      setHistoryLoading(false) })
+      .catch(err => { console.warn('[DataContext] history failed:', err);   setHistoryLoading(false) })
+
+    const p3 = getOverallReport(token)
+      .then(data => { setOverallReport(data); setReportLoading(false) })
+      .catch(err => { console.warn('[DataContext] report failed:', err);    setReportLoading(false) })
+
+    return Promise.all([p1, p2, p3])
+  }
+
   const prefetchAll = async () => {
     try {
       const token = await getAuthToken()
-      const [analyticsRes, historyRes, reportRes] = await Promise.allSettled([
-        getAnalytics(token),
-        getInterviewHistory(token, 50, 0),
-        getOverallReport(token),
-      ])
-
-      if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value)
-      setAnalyticsLoading(false)
-
-      if (historyRes.status === 'fulfilled') setHistory(historyRes.value)
-      setHistoryLoading(false)
-
-      if (reportRes.status === 'fulfilled') setOverallReport(reportRes.value)
-      setReportLoading(false)
+      await fetchIndependent(token)
     } catch (err) {
       console.error('[DataContext] Prefetch error:', err)
-      setAnalyticsLoading(false)
-      setHistoryLoading(false)
-      setReportLoading(false)
     }
   }
 
@@ -61,14 +90,15 @@ export function DataProvider({ children }) {
     setAnalyticsLoading(true)
     setHistoryLoading(true)
     setReportLoading(true)
-    prefetchedRef.current = false
-    await prefetchAll()
+    const token = await getAuthToken()
+    await fetchIndependent(token)
   }
 
   // ── Auto-prefetch after login sync completes ───────────────────────────────
   useEffect(() => {
     if (syncComplete && isSignedIn && !prefetchedRef.current) {
       prefetchedRef.current = true
+      preloadAssets()
       prefetchAll()
     }
   }, [syncComplete, isSignedIn])
@@ -77,7 +107,7 @@ export function DataProvider({ children }) {
   useEffect(() => {
     if (!isSignedIn) {
       setAnalytics(null)
-      setHistory(null)
+      setHistory([])
       setOverallReport(null)
       setAnalyticsLoading(true)
       setHistoryLoading(true)

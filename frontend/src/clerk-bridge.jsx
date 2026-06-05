@@ -56,7 +56,7 @@ export function ClerkProvider({ children, publishableKey, ...props }) {
 
 export function useUser() {
   const mockContext = useContext(MockAuthContext);
-  
+
   // 1. If a local mock user session is active, return the mock user
   if (mockContext?.mockUser) {
     return {
@@ -248,7 +248,8 @@ export function SignIn(props) {
         primaryEmailAddress: { emailAddress: 'jane.doe@example.com' },
         imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
       });
-      window.location.href = '/dashboard';
+      window.location.href = '/interview/setup'
+      // ';
     }
   };
 
@@ -307,7 +308,7 @@ export function SignUp(props) {
         primaryEmailAddress: { emailAddress: 'jane.doe@example.com' },
         imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
       });
-      window.location.href = '/dashboard';
+      window.location.href = '/interview/setup';
     }
   };
 
