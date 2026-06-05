@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, Search, Filter, Mic, Calendar, BarChart2 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import { Card, Badge, EmptyState, PageLoader } from '../components/ui'
-import { getInterviewHistory } from '../services/api'
-import { useAuthContext } from '../context/AuthContext'
+import { useDataContext } from '../context/DataContext'
 
 function scoreColor(s) {
   if (!s) return 'text-gray-500'
@@ -15,27 +14,10 @@ function scoreColor(s) {
 }
 
 export default function HistoryPage() {
-  const { getAuthToken } = useAuthContext()
-  const [sessions, setSessions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { history: sessions, historyLoading: loading } = useDataContext()
   const [search, setSearch] = useState('')
   const [filterDifficulty, setFilterDifficulty] = useState('all')
   const [sortBy, setSortBy] = useState('date')
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const token = await getAuthToken()
-        const data = await getInterviewHistory(token, 50, 0)
-        setSessions(data)
-      } catch (err) {
-        console.error('History load error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
 
   // Filter + sort
   const filtered = sessions

@@ -36,3 +36,4 @@ class UserSync(BaseModel):
     name: str
     email: str
     profile_image: Optional[str] = None
+    is_signup: Optional[bool] = False

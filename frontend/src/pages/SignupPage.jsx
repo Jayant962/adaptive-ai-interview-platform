@@ -1,9 +1,13 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { SignUp } from '../clerk-bridge'
 import { Link } from 'react-router-dom'
 import { Zap } from 'lucide-react'
 
 export default function SignupPage() {
+  useEffect(() => {
+    sessionStorage.setItem('is_signup_flow', 'true')
+  }, [])
+
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col items-center justify-center px-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(109,95,232,0.1)_0%,transparent_60%)]" />

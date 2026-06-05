@@ -143,13 +143,13 @@ def send_welcome_email(to_email: str, name: str):
         logger.info(f"Simulating Welcome Email: To={to_email}, Name={name}")
         # Print simulated output to stdout for clear developer review
         print("\n" + "="*50)
-        print(f"📧 [MOCK EMAIL SENT]")
+        print(f"[MOCK EMAIL SENT]")
         print(f"To: {to_email}")
         print(f"From: {smtp_from}")
-        print(f"Subject: {subject}")
+        print(f"Subject: {subject.encode('ascii', errors='ignore').decode('ascii')}")
         print(f"Body:\n{text_content.strip()}")
         print("="*50 + "\n")
-        return
+        return True
 
     try:
         msg = MIMEMultipart("alternative")
@@ -183,7 +183,9 @@ def send_welcome_email(to_email: str, name: str):
             server.sendmail(smtp_from, to_email, msg.as_string())
             
         logger.info(f"Welcome email successfully sent to {to_email}")
-        print(f"📧 [EMAIL SENT SUCCESS] Welcome email sent to {to_email}")
+        print(f"[EMAIL SENT SUCCESS] Welcome email sent to {to_email}")
+        return True
     except Exception as e:
         logger.error(f"Failed to send welcome email to {to_email}: {str(e)}")
-        print(f"❌ [EMAIL SEND ERROR] Failed to send to {to_email}: {str(e)}")
+        print(f"[EMAIL SEND ERROR] Failed to send to {to_email}: {str(e)}")
+        return False

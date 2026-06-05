@@ -8,6 +8,7 @@ import {
 } from '../context/InterviewContext'
 import { useAuthContext } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { useDataContext } from '../context/DataContext'
 import {
   submitAnswer, getFollowUp, getNextQuestion, endInterview
 } from '../services/api'
@@ -27,6 +28,7 @@ export default function InterviewPage() {
   const navigate = useNavigate()
   const { getAuthToken } = useAuthContext()
   const { isDark, toggle: toggleTheme } = useTheme()
+  const { invalidateCache } = useDataContext()
   const interview = useInterview()
   const {
     sessionId, topic, difficulty, phase,
@@ -344,11 +346,14 @@ export default function InterviewPage() {
       const token = await getAuthToken()
       await endInterview(token, sessionId)
       navigate(`/reports/${sessionId}`)
+      // Bust the cache in background so dashboard/history/reports are fresh when user returns
+      invalidateCache().catch(() => {})
     } catch (err) {
       console.error('End interview error:', err)
       navigate(`/reports/${sessionId}`)
+      invalidateCache().catch(() => {})
     }
-  }, [sessionId, navigate, getAuthToken, setPhase, setAvatarState])
+  }, [sessionId, navigate, getAuthToken, setPhase, setAvatarState, invalidateCache])
 
   const handleSubmitAnswer = useCallback(async () => {
     const transcript = finalTranscript || liveTranscript

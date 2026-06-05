@@ -11,6 +11,15 @@ export function AuthProvider({ children }) {
   const { signOut } = useClerk()
   const [dbUser, setDbUser] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [syncComplete, setSyncComplete] = useState(false)
+
+  // Reset sync state when user logs out
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      setDbUser(null)
+      setSyncComplete(false)
+    }
+  }, [isLoaded, isSignedIn])
 
   // Force re-login if session age exceeds 48 hours
   useEffect(() => {
@@ -41,19 +50,43 @@ export function AuthProvider({ children }) {
 
     const sync = async () => {
       setSyncing(true)
+      const isSignupFlow = window.location.pathname === '/signup' || sessionStorage.getItem('is_signup_flow') === 'true'
       try {
         const userData = {
           clerk_user_id: user.id,
           name: user.fullName || user.firstName || 'User',
           email: user.primaryEmailAddress?.emailAddress || '',
           profile_image: user.imageUrl || null,
+          is_signup: isSignupFlow,
         }
         const result = await syncUser(userData)
         setDbUser(result)
+
+        if (!result.is_new_user && isSignupFlow) {
+          sessionStorage.removeItem('is_signup_flow')
+          try {
+            await signOut()
+          } catch (e) {
+            console.error('Failed to sign out existing user:', e)
+          }
+          window.location.href = '/login?already_registered=true'
+        } else {
+          sessionStorage.removeItem('is_signup_flow')
+        }
       } catch (err) {
         console.error('User sync failed:', err)
+        if (isSignupFlow) {
+          sessionStorage.removeItem('is_signup_flow')
+          try {
+            await signOut()
+          } catch (e) {
+            console.error('Failed to sign out on sync error:', e)
+          }
+          window.location.href = '/login?already_registered=true'
+        }
       } finally {
         setSyncing(false)
+        setSyncComplete(true)
       }
     }
 
@@ -75,6 +108,7 @@ export function AuthProvider({ children }) {
     isLoaded,
     isSignedIn,
     syncing,
+    syncComplete,   // True once first backend sync has completed
     getAuthToken,
   }
 

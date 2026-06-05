@@ -1,31 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { Award, Briefcase, Calendar, Clock, Sparkles, Brain, MessageSquare, ShieldAlert, ArrowRight, Lightbulb } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import { Card, Badge, ScoreRing, ScoreBar, PageLoader, EmptyState } from '../components/ui'
-import { getOverallReport } from '../services/api'
-import { useAuthContext } from '../context/AuthContext'
+import { useDataContext } from '../context/DataContext'
 
 export default function ReportsPage() {
-  const { getAuthToken } = useAuthContext()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const token = await getAuthToken()
-        const result = await getOverallReport(token)
-        setData(result)
-      } catch (err) {
-        setError(err.message || 'Failed to load overall report')
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
-  }, [])
+  const { overallReport: data, reportLoading: loading } = useDataContext()
+  const error = null
 
   if (loading) return <PageLoader message="Compiling your overall report..." />
 

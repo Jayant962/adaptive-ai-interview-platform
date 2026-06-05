@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../clerk-bridge'
 import {
@@ -12,8 +12,12 @@ import {
 } from 'lucide-react'
 import DashboardLayout from '../layouts/DashboardLayout'
 import { Card, Badge, ScoreRing, EmptyState, PageLoader } from '../components/ui'
-import { getAnalytics } from '../services/api'
-import { useAuthContext } from '../context/AuthContext'
+import { useDataContext } from '../context/DataContext'
+import { useGLTF } from '@react-three/drei'
+
+// Preload the 3D avatar model in the background as soon as user lands on dashboard.
+// By the time they navigate to the interview page the 14MB GLB is already cached.
+useGLTF.preload('/model.glb')
 
 function StatCard({ label, value, sub, color = 'text-white', icon: Icon }) {
   return (
@@ -42,24 +46,7 @@ const COLORS = {
 
 export default function DashboardPage() {
   const { user } = useUser()
-  const { getAuthToken } = useAuthContext()
-  const [analytics, setAnalytics] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const token = await getAuthToken()
-        const data = await getAnalytics(token)
-        setAnalytics(data)
-      } catch (err) {
-        console.error('Analytics load error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  const { analytics, analyticsLoading: loading } = useDataContext()
 
   if (loading) return (
     <DashboardLayout>

@@ -65,17 +65,27 @@ def get_or_create_user(
     name: str,
     email: str,
     profile_image: Optional[str] = None
-) -> User:
+) -> tuple:
     """
     Get existing user or create new one.
     Called after Clerk authentication.
+
+    Returns:
+        (user, is_new_user) — is_new_user is True only for brand-new registrations.
     """
     from datetime import datetime
 
     user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
 
+    # Fallback to search by email if Clerk user ID is not found.
+    # This prevents unique constraint violation crashes if Clerk identities are reset/recreated.
+    if not user and email:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.clerk_user_id = clerk_user_id
+
     if user:
-        # Update last login
+        # Existing user — update last login & profile
         user.last_login = datetime.utcnow()
         if name and name != user.name:
             user.name = name
@@ -85,9 +95,9 @@ def get_or_create_user(
             user.profile_image = profile_image
         db.commit()
         db.refresh(user)
-        return user
+        return user, False  # Not a new user
 
-    # Create new user
+    # Brand-new user
     user = User(
         clerk_user_id=clerk_user_id,
         name=name,
@@ -97,7 +107,7 @@ def get_or_create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return user, True  # New user
 
 
 def get_user_by_clerk_id(db: Session, clerk_user_id: str) -> Optional[User]:

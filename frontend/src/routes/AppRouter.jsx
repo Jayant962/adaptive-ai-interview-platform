@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '../context/AuthContext'
 import { ThemeProvider } from '../context/ThemeContext'
 import { InterviewProvider } from '../context/InterviewContext'
+import { DataProvider } from '../context/DataContext'
 import ProtectedRoute from './ProtectedRoute'
 
 import LoginPage from '../pages/LoginPage'
@@ -31,28 +32,30 @@ export default function AppRouter() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <InterviewProvider>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/"        element={<LandingPage />} />
-                <Route path="/login/*"   element={<LoginPage />} />
-                <Route path="/signup/*"  element={<SignupPage />} />
+          <DataProvider>
+            <InterviewProvider>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/"        element={<LandingPage />} />
+                  <Route path="/login/*"   element={<LoginPage />} />
+                  <Route path="/signup/*"  element={<SignupPage />} />
 
-                {/* Protected routes */}
-                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-                <Route path="/interview/setup"   element={<ProtectedRoute><SetupPage /></ProtectedRoute>} />
-                <Route path="/interview/session" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
-                <Route path="/reports/:sessionId" element={<ProtectedRoute><ReportPage /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-                <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  {/* Protected routes */}
+                  <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+                  <Route path="/interview/setup"   element={<ProtectedRoute><SetupPage /></ProtectedRoute>} />
+                  <Route path="/interview/session" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
+                  <Route path="/reports/:sessionId" element={<ProtectedRoute><ReportPage /></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+                  <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
-                {/* Fallback */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </InterviewProvider>
+                  {/* Fallback */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </InterviewProvider>
+          </DataProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
