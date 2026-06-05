@@ -18,6 +18,8 @@ export default function SignupPage() {
 
         <div className="flex justify-center">
           <SignUp
+            routing="path"
+            path="/signup"
             appearance={{
               variables: {
                 colorPrimary: '#6d5fe8',
@@ -40,11 +42,6 @@ export default function SignupPage() {
             signInUrl="/login"
           />
         </div>
-
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-primary-400 hover:text-primary-300">Sign in</Link>
-        </p>
       </div>
     </div>
   )

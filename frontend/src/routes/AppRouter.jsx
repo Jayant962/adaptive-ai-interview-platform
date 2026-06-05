@@ -5,10 +5,11 @@ import { ThemeProvider } from '../context/ThemeContext'
 import { InterviewProvider } from '../context/InterviewContext'
 import ProtectedRoute from './ProtectedRoute'
 
+import LoginPage from '../pages/LoginPage'
+import SignupPage from '../pages/SignupPage'
+
 // Lazy-loaded pages
 const LandingPage    = lazy(() => import('../pages/LandingPage'))
-const LoginPage      = lazy(() => import('../pages/LoginPage'))
-const SignupPage     = lazy(() => import('../pages/SignupPage'))
 const DashboardPage  = lazy(() => import('../pages/DashboardPage'))
 const SetupPage      = lazy(() => import('../pages/SetupPage'))
 const InterviewPage  = lazy(() => import('../pages/InterviewPage'))
@@ -35,8 +36,8 @@ export default function AppRouter() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/"        element={<LandingPage />} />
-                <Route path="/login"   element={<LoginPage />} />
-                <Route path="/signup"  element={<SignupPage />} />
+                <Route path="/login/*"   element={<LoginPage />} />
+                <Route path="/signup/*"  element={<SignupPage />} />
 
                 {/* Protected routes */}
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

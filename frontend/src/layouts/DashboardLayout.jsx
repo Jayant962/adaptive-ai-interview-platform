@@ -4,7 +4,7 @@ import { useUser, useClerk } from '../clerk-bridge'
 import { clsx } from 'clsx'
 import {
   LayoutDashboard, Mic, FileText, History,
-  User, LogOut, Settings, Menu, X, Zap, Bell, Moon, Sun
+  User, LogOut, Settings, Menu, X, Zap, Moon, Sun
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 
@@ -126,9 +126,7 @@ export default function DashboardLayout({ children }) {
             >
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <button className="w-9 h-9 rounded-xl bg-dark-600 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-              <Bell size={16} />
-            </button>
+
             <Link to="/interview/setup">
               <button className="hidden sm:flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
                 <Mic size={15} />

@@ -39,7 +39,7 @@ def calculate_vocabulary_diversity(text: str) -> float:
     """
     Calculate Type-Token Ratio (TTR) for vocabulary diversity.
     TTR = unique_words / total_words
-    Score is normalized 0-100.
+    Score is normalized 0-100 and scaled by word count.
     """
     if not text.strip():
         return 0.0
@@ -53,7 +53,10 @@ def calculate_vocabulary_diversity(text: str) -> float:
 
     # Normalize: TTR of 0.7+ is excellent, 0.3 is poor
     normalized = min(100.0, (ttr / 0.7) * 100)
-    return round(normalized, 2)
+    
+    # Scale based on word count to prevent artificially high diversity scores on short responses
+    length_factor = min(1.0, len(words) / 50.0)
+    return round(normalized * length_factor, 2)
 
 
 def analyze_sentence_structure(text: str) -> Dict:
@@ -217,6 +220,7 @@ def run_nlp_analysis(transcript: str) -> Dict:
         "word_count": len(transcript.split()),
         "stop_word_count": stop_word_data["stop_word_count"],
         "stop_word_analysis": stop_word_data,
+        "transcript": transcript,
     }
 
 

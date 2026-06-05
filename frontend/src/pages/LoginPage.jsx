@@ -1,9 +1,13 @@
 import React from 'react'
 import { SignIn } from '../clerk-bridge'
-import { Link } from 'react-router-dom'
-import { Zap } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { Zap, AlertTriangle } from 'lucide-react'
 
 export default function LoginPage() {
+  const location = useLocation()
+  const queryParams = new URLSearchParams(location.search)
+  const isExpired = queryParams.get('expired') === 'true'
+
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col items-center justify-center px-4">
       {/* Background */}
@@ -18,9 +22,25 @@ export default function LoginPage() {
           <span className="text-white font-bold text-2xl">AI Interviewer</span>
         </div>
 
+        {/* Expiration warning notice */}
+        {isExpired && (
+          <div className="mb-6 p-4 bg-amber-950/40 border border-amber-500/20 rounded-2xl flex items-start gap-3 text-amber-200 shadow-xl backdrop-blur-sm animate-fade-in">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-400 mt-0.5" />
+            <div className="text-xs sm:text-sm leading-relaxed">
+              <span className="font-bold block text-white mb-0.5">Session Expired (48 Hours)</span>
+              For your security, your session has expired. To continue, please sign in again.
+              <span className="block mt-1.5 text-[11px] text-amber-300/70">
+                Note: If signing in via Google/Gmail, please make sure to explicitly select your account to refresh credentials.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Clerk SignIn Component */}
         <div className="flex justify-center">
           <SignIn
+            routing="path"
+            path="/login"
             appearance={{
               variables: {
                 colorPrimary: '#6d5fe8',
@@ -45,11 +65,6 @@ export default function LoginPage() {
             signUpUrl="/signup"
           />
         </div>
-
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Don't have an account?{' '}
-          <Link to="/signup" className="text-primary-400 hover:text-primary-300">Sign up free</Link>
-        </p>
       </div>
     </div>
   )

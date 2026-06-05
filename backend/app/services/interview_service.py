@@ -135,7 +135,7 @@ def submit_answer_and_evaluate(
     # ── COMMUNICATION EVALUATION (NLP + ML) ──
     nlp_data = run_nlp_analysis(transcript)
     lt_data = run_language_tool_check(transcript)
-    comm_result = compute_all_communication_scores(nlp_data, lt_data)
+    comm_result = compute_all_communication_scores(nlp_data, lt_data, duration=duration)
 
     # Save communication score
     comm_score = CommunicationScore(

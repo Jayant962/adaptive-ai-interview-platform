@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Volume2, VolumeX, Maximize2, Loader2 } from 'lucide-react'
+import { X, Volume2, VolumeX, Maximize2, Loader2, Sun, Moon } from 'lucide-react'
 import {
   useInterview,
   AVATAR_STATES,
   INTERVIEW_PHASES,
 } from '../context/InterviewContext'
 import { useAuthContext } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import {
   submitAnswer, getFollowUp, getNextQuestion, endInterview
 } from '../services/api'
@@ -25,6 +26,7 @@ import { useTimer } from '../hooks/useTimer'
 export default function InterviewPage() {
   const navigate = useNavigate()
   const { getAuthToken } = useAuthContext()
+  const { isDark, toggle: toggleTheme } = useTheme()
   const interview = useInterview()
   const {
     sessionId, topic, difficulty, phase,
@@ -502,7 +504,14 @@ export default function InterviewPage() {
             </button>
           )}
           <button
-            onClick={() => { shouldSpeakRef.current = false; stopSpeaking(); setExitConfirm(true); }}
+            onClick={toggleTheme}
+            className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white transition-colors border border-white/5"
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button
+            onClick={() => { shouldSpeakRef.current = false; stopSpeaking(); setAvatarState(AVATAR_STATES.IDLE); setExitConfirm(true); }}
             className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors"
           >
             <X size={15} />
@@ -514,8 +523,8 @@ export default function InterviewPage() {
       <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto">
         <div className="flex flex-col lg:flex-row gap-4 lg:min-h-[calc(100vh-140px)]">
           {/* Left: Avatar Column */}
-          <div className="lg:w-[42%] flex-none bg-dark-800 p-4 flex flex-col gap-4 rounded-2xl" style={{ minHeight: '80vh' }}>
-            <div className="flex-1 rounded-2xl overflow-hidden" style={{ minHeight: '380px', maxHeight: '600px' }}>
+          <div className="lg:w-[42%] flex-none bg-dark-800 p-4 flex flex-col gap-4 rounded-2xl lg:min-h-[80vh]">
+            <div className="relative w-full h-[60vw] lg:h-[500px] rounded-2xl overflow-hidden">
               <AvatarPanel avatarState={avatarState} />
             </div>
 
@@ -544,7 +553,7 @@ export default function InterviewPage() {
           </div>
 
           {/* Right: Question + Recording */}
-          <div className="flex-1 flex flex-col gap-4" style={{ minHeight: '80vh' }}>
+          <div className="flex-1 flex flex-col gap-4 lg:min-h-[80vh]">
             {/* Current Question */}
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-3">

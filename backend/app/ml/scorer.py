@@ -4,97 +4,147 @@ Completely independent from Groq.
 Converts NLP features into scores using rule-based + ML approach.
 """
 import math
-from typing import Dict
+from typing import Dict, Optional
+
+
+def is_generic_response(transcript: Optional[str], word_count: int) -> bool:
+    """
+    Identify generic, evasive, or extremely short responses.
+    Aligns with the backend evaluation logic.
+    """
+    if not transcript or not transcript.strip():
+        return True
+    if word_count < 8:  # Strict minimum word count threshold
+        return True
+
+    text_lower = transcript.lower().strip().replace(".", "").replace("!", "").replace("?", "")
+    generic_phrases = [
+        "i don't know", "i do not know", "i am not sure", "no idea", "not sure",
+        "let me think", "i forgot", "pass", "no comment", "don't know", "skip"
+    ]
+    return any(phrase in text_lower for phrase in generic_phrases)
 
 
 def compute_grammar_score(nlp_data: Dict, lt_data: Dict) -> float:
     """
     Grammar score based on:
-    - Language tool error count
-    - Basic grammar errors
-    - Sentence structure
-    - Word count (too short = penalized)
+    - Language tool error density
+    - Repeated words density
+    - Response length (stricter penalty)
     """
+    transcript = nlp_data.get("transcript", "")
     word_count = nlp_data.get("word_count", 0)
-    if word_count == 0:
+    
+    if is_generic_response(transcript, word_count):
         return 0.0
-    if word_count < 5:
-        return 20.0
 
-    # Base score starts at 100
     score = 100.0
 
-    # Deduct for language tool errors
+    # Deduct for language tool errors based on density (stricter penalty)
     lt_errors = lt_data.get("error_count", 0)
-    score -= min(40, lt_errors * 5)  # Max 40 points deduction
+    if word_count > 0:
+        error_density = lt_errors / word_count
+        score -= min(60.0, error_density * 500.0)
 
-    # Deduct for repeated words
-    repeated = len(nlp_data.get("grammar_analysis", {}).get("repeated_words", []))
-    score -= min(15, repeated * 5)
+    # Deduct for repeated words based on density
+    repeated_words = nlp_data.get("grammar_analysis", {}).get("repeated_words", [])
+    if word_count > 0:
+        repeated_density = len(repeated_words) / word_count
+        score -= min(20.0, repeated_density * 300.0)
 
-    # Deduct for very short response
-    if word_count < 20:
-        score -= 20
-    elif word_count < 40:
-        score -= 10
+    # Deduct for short response (stricter penalty)
+    if word_count < 15:
+        score -= 50.0
+    elif word_count < 30:
+        score -= 30.0
+    elif word_count < 50:
+        score -= 15.0
+    elif word_count < 75:
+        score -= 5.0
 
-    return max(10.0, round(score, 1))
+    return max(0.0, round(score, 1))
 
 
-def compute_fluency_score(nlp_data: Dict) -> float:
+def compute_fluency_score(nlp_data: Dict, duration: Optional[float] = None) -> float:
     """
     Fluency score based on:
+    - Speaking pace (Words Per Minute)
     - Sentence count and length
-    - Vocabulary diversity
-    - Absence of excessive fillers
+    - Vocabulary diversity (scaled by length)
+    - Filler word ratio (stricter penalty)
     """
+    transcript = nlp_data.get("transcript", "")
     word_count = nlp_data.get("word_count", 0)
-    if word_count == 0:
+    
+    if is_generic_response(transcript, word_count):
         return 0.0
-    if word_count < 5:
-        return 20.0
 
     score = 100.0
     sentence_data = nlp_data.get("sentence_analysis", {})
     vocab_diversity = nlp_data.get("vocab_diversity", 50.0)
     filler_count = nlp_data.get("filler_count", 0)
 
-    # Reward good sentence structure
-    avg_len = sentence_data.get("avg_length", 0)
-    if avg_len < 5:
-        score -= 25  # Very short sentences
-    elif avg_len > 30:
-        score -= 10  # Very long sentences
+    # 1. Speaking pace (WPM) - Stricter penalty
+    if duration and duration > 0:
+        wpm = (word_count / duration) * 60.0
+        # Standard professional speaking rate is 110-160 WPM
+        if wpm < 40:
+            score -= 50.0  # Extremely slow (long pauses)
+        elif wpm < 70:
+            score -= 35.0  # Slow
+        elif wpm < 100:
+            score -= 15.0  # Slightly slow
+        elif wpm > 180:
+            score -= 20.0  # Too fast
+        elif wpm > 220:
+            score -= 40.0  # Extremely fast / rushed
 
-    # Vocabulary diversity contribution
-    vocab_contribution = (vocab_diversity / 100) * 30
-    score = (score * 0.70) + vocab_contribution
-
-    # Filler word penalty
+    # 2. Filler word penalty (strictly proportional to ratio, stricter penalty)
     filler_ratio = filler_count / max(word_count, 1)
-    if filler_ratio > 0.15:
-        score -= 30
-    elif filler_ratio > 0.08:
-        score -= 15
-    elif filler_ratio > 0.04:
-        score -= 5
+    if filler_ratio > 0.12:
+        score -= 40.0
+    elif filler_ratio > 0.06:
+        score -= 25.0
+    elif filler_ratio > 0.03:
+        score -= 15.0
+    elif filler_ratio > 0.01:
+        score -= 5.0
 
-    return max(10.0, round(score, 1))
+    # 3. Sentence structure - Stricter avg sentence length checks
+    avg_len = sentence_data.get("avg_length", 0)
+    if avg_len < 8:
+        score -= 25.0  # Very short, choppy sentences
+    elif avg_len > 35:
+        score -= 15.0  # Extremely long run-on sentences
+
+    # 4. Length penalty - Stricter length penalty
+    if word_count < 15:
+        score -= 40.0
+    elif word_count < 30:
+        score -= 20.0
+    elif word_count < 50:
+        score -= 10.0
+
+    # 5. Vocabulary diversity contribution
+    vocab_contribution = (vocab_diversity / 100.0) * 25.0
+    score = (score * 0.75) + vocab_contribution
+
+    return max(0.0, round(score, 1))
 
 
 def compute_confidence_score(nlp_data: Dict) -> float:
     """
     Confidence score based on:
-    - Filler words
-    - Hedging language
-    - Assertive language
-    - Response length
+    - Filler words ratio (stricter)
+    - Hedging language ratio (stricter)
+    - Assertive language (length-scaled)
+    - Response length (stricter)
     """
+    transcript = nlp_data.get("transcript", "")
     word_count = nlp_data.get("word_count", 0)
-    if word_count == 0:
+    
+    if is_generic_response(transcript, word_count):
         return 0.0
-    if word_count < 5:
-        return 20.0
 
     score = 100.0
     confidence_data = nlp_data.get("confidence_markers", {})
@@ -102,20 +152,39 @@ def compute_confidence_score(nlp_data: Dict) -> float:
     hedge_count = confidence_data.get("hedge_count", 0)
     assertive_count = confidence_data.get("assertive_count", 0)
 
-    # Filler penalty
-    score -= min(30, filler_count * 4)
+    # 1. Filler word ratio penalty - Stricter
+    filler_ratio = filler_count / max(word_count, 1)
+    if filler_ratio > 0.12:
+        score -= 35.0
+    elif filler_ratio > 0.06:
+        score -= 20.0
+    elif filler_ratio > 0.02:
+        score -= 10.0
 
-    # Hedging penalty
-    score -= min(25, hedge_count * 6)
+    # 2. Hedging language ratio penalty - Stricter
+    hedge_ratio = hedge_count / max(word_count, 1)
+    if hedge_ratio > 0.10:
+        score -= 35.0
+    elif hedge_ratio > 0.05:
+        score -= 20.0
+    elif hedge_ratio > 0.01:
+        score -= 10.0
 
-    # Assertive bonus
-    score += min(15, assertive_count * 4)
+    # 3. Assertive bonus (scaled based on length to prevent gaming on short answers)
+    length_scale = min(1.0, word_count / 40.0)
+    score += min(15.0, assertive_count * 3.0) * length_scale
 
-    # Very short answers show low confidence
-    if word_count < 30:
-        score -= 15
+    # 4. Response length penalty - Stricter
+    if word_count < 15:
+        score -= 50.0
+    elif word_count < 30:
+        score -= 30.0
+    elif word_count < 50:
+        score -= 15.0
+    elif word_count < 75:
+        score -= 5.0
 
-    return max(10.0, round(min(score, 100.0), 1))
+    return max(0.0, round(min(score, 100.0), 1))
 
 
 def compute_communication_score(
@@ -144,18 +213,32 @@ def compute_communication_score(
     return round(min(100.0, max(0.0, score)), 1)
 
 
-def compute_all_communication_scores(nlp_data: Dict, lt_data: Dict) -> Dict:
+def compute_all_communication_scores(
+    nlp_data: Dict, 
+    lt_data: Dict, 
+    duration: Optional[float] = None
+) -> Dict:
     """
     Main ML scoring function.
     Takes NLP analysis output and returns all communication scores.
     """
-    grammar_score = compute_grammar_score(nlp_data, lt_data)
-    fluency_score = compute_fluency_score(nlp_data)
-    confidence_score = compute_confidence_score(nlp_data)
-    vocab_diversity = nlp_data.get("vocab_diversity", 50.0)
-    communication_score = compute_communication_score(
-        grammar_score, fluency_score, confidence_score, vocab_diversity
-    )
+    transcript = nlp_data.get("transcript", "")
+    word_count = nlp_data.get("word_count", 0)
+
+    if is_generic_response(transcript, word_count):
+        grammar_score = 0.0
+        fluency_score = 0.0
+        confidence_score = 0.0
+        vocab_diversity = 0.0
+        communication_score = 0.0
+    else:
+        grammar_score = compute_grammar_score(nlp_data, lt_data)
+        fluency_score = compute_fluency_score(nlp_data, duration)
+        confidence_score = compute_confidence_score(nlp_data)
+        vocab_diversity = nlp_data.get("vocab_diversity", 50.0)
+        communication_score = compute_communication_score(
+            grammar_score, fluency_score, confidence_score, vocab_diversity
+        )
 
     filler_words = nlp_data.get("filler_words", {})
     filler_count = nlp_data.get("filler_count", 0)

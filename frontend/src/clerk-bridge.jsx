@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import * as ClerkReal from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
 
 // Determine if Clerk publishable key is valid
 const rawKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -82,6 +83,36 @@ export function useUser() {
   };
 }
 
+export function useSession() {
+  const mockContext = useContext(MockAuthContext);
+
+  if (mockContext?.mockUser) {
+    return {
+      isLoaded: true,
+      isSignedIn: true,
+      session: {
+        id: 'sess_mock',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    };
+  }
+
+  if (isClerkAvailable) {
+    try {
+      return ClerkReal.useSession();
+    } catch (e) {
+      console.warn("Clerk useSession failed:", e);
+    }
+  }
+
+  return {
+    isLoaded: true,
+    isSignedIn: false,
+    session: null,
+  };
+}
+
 export function useAuth() {
   const mockContext = useContext(MockAuthContext);
 
@@ -147,8 +178,64 @@ export function useClerk() {
   };
 }
 
+// ─── Shared spinner shown while Clerk SDK initializes ────────────────────────
+function ClerkLoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center" style={{ minHeight: '320px' }}>
+      <div
+        style={{
+          width: '40px', height: '40px',
+          border: '3px solid rgba(109,95,232,0.25)',
+          borderTopColor: '#6d5fe8',
+          borderRadius: '50%',
+          animation: 'spin 0.7s linear infinite',
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// Inner component that lives inside ClerkProvider — safe to call ClerkReal hooks
+function ClerkSignInInner({ onSwitchToDemo, ...props }) {
+  const { isLoaded } = ClerkReal.useUser();
+  if (!isLoaded) return <ClerkLoadingSpinner />;
+  return (
+    <div className="flex flex-col items-center">
+      <ClerkReal.SignIn {...props} />
+      <button
+        onClick={onSwitchToDemo}
+        className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold underline transition duration-200"
+      >
+        Want to Sign In as Demo User instead?
+      </button>
+    </div>
+  );
+}
+
+// Inner component that lives inside ClerkProvider — safe to call ClerkReal hooks
+function ClerkSignUpInner({ onSwitchToDemo, ...props }) {
+  const { isLoaded } = ClerkReal.useUser();
+  if (!isLoaded) return <ClerkLoadingSpinner />;
+  return (
+    <div className="flex flex-col items-center">
+      <ClerkReal.SignUp {...props} />
+      <button
+        onClick={onSwitchToDemo}
+        className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold underline transition duration-200"
+      >
+        Want to Sign Up as Demo User instead?
+      </button>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function SignIn(props) {
   const mockContext = useContext(MockAuthContext);
+
+  // Always default to showing Clerk when available — no localStorage persistence
+  // This ensures navigating between login/signup never flashes the demo card
   const [showClerk, setShowClerk] = useState(isClerkAvailable);
 
   const loginAsDemo = () => {
@@ -166,17 +253,7 @@ export function SignIn(props) {
   };
 
   if (showClerk) {
-    return (
-      <div className="flex flex-col items-center">
-        <ClerkReal.SignIn {...props} />
-        <button
-          onClick={() => setShowClerk(false)}
-          className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold underline transition duration-200"
-        >
-          Want to Sign In as Demo User instead?
-        </button>
-      </div>
-    );
+    return <ClerkSignInInner onSwitchToDemo={() => setShowClerk(false)} {...props} />;
   }
 
   return (
@@ -188,8 +265,8 @@ export function SignIn(props) {
       <p className="text-neutral-400 text-sm mb-8 leading-relaxed">
         Click below to sign in instantly with a pre-configured developer profile, or switch to your real Clerk credentials.
       </p>
-      
-      <button 
+
+      <button
         onClick={loginAsDemo}
         className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-2xl shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 active:scale-95 mb-4"
       >
@@ -215,6 +292,9 @@ export function SignIn(props) {
 
 export function SignUp(props) {
   const mockContext = useContext(MockAuthContext);
+
+  // Always default to showing Clerk when available — no localStorage persistence
+  // This ensures navigating between login/signup never flashes the demo card
   const [showClerk, setShowClerk] = useState(isClerkAvailable);
 
   const loginAsDemo = () => {
@@ -232,17 +312,7 @@ export function SignUp(props) {
   };
 
   if (showClerk) {
-    return (
-      <div className="flex flex-col items-center">
-        <ClerkReal.SignUp {...props} />
-        <button
-          onClick={() => setShowClerk(false)}
-          className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold underline transition duration-200"
-        >
-          Want to Sign Up as Demo User instead?
-        </button>
-      </div>
-    );
+    return <ClerkSignUpInner onSwitchToDemo={() => setShowClerk(false)} {...props} />;
   }
 
   return (
@@ -254,8 +324,8 @@ export function SignUp(props) {
       <p className="text-neutral-400 text-sm mb-8 leading-relaxed">
         Click below to sign up instantly with a pre-configured developer profile, or switch to your real Clerk credentials.
       </p>
-      
-      <button 
+
+      <button
         onClick={loginAsDemo}
         className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-2xl shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 active:scale-95 mb-4"
       >
@@ -278,3 +348,4 @@ export function SignUp(props) {
     </div>
   );
 }
+
