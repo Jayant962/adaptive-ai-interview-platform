@@ -47,6 +47,10 @@ export default function InterviewPage() {
   const [audioUrl, setAudioUrl] = useState(null)
   const [loadingNext, setLoadingNext] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
+  // Brave/Edge: webkitSpeechRecognition hits 'network' errors when Google's
+  // cloud API is blocked. After 3 failures we stop restarting recognition
+  // but keep MediaRecorder running so the user can still submit via Whisper.
+  const [speechFallback, setSpeechFallback] = useState(false)
 
   const recognitionRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -57,6 +61,8 @@ export default function InterviewPage() {
   const isRecordingRef = useRef(false)
   const accumulatedTranscriptRef = useRef('')
   const shouldSpeakRef = useRef(true)
+  const networkErrorCountRef = useRef(0)      // counts consecutive 'network' errors
+  const stopSpeechRecognitionRef = useRef(false) // true = recognition disabled, recorder still runs
   const { seconds: totalSeconds, formatted: totalFormatted } = useTimer(true)
   const { seconds: answerSeconds, formatted: answerFormatted, reset: resetAnswerTimer } = useTimer(isRecording)
 
@@ -101,35 +107,19 @@ export default function InterviewPage() {
     return () => {
       active = false
       shouldSpeakRef.current = false
-      // Clean up TTS audio
       stopSpeaking()
       isRecordingRef.current = false
-      
-      // Clean up speech recognition
+      networkErrorCountRef.current = 0
+      stopSpeechRecognitionRef.current = false
+
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort()
-        } catch (e) {
-          console.error('Error aborting speech recognition during unmount:', e)
-        }
+        try { recognitionRef.current.abort() } catch (e) {}
       }
-
-      // Clean up media recorder
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        try {
-          mediaRecorderRef.current.stop()
-        } catch (e) {
-          console.error('Error stopping media recorder during unmount:', e)
-        }
+        try { mediaRecorderRef.current.stop() } catch (e) {}
       }
-
-      // Stop all tracks of active mic stream to release mic icon
       if (mediaStreamRef.current) {
-        try {
-          mediaStreamRef.current.getTracks().forEach(track => track.stop())
-        } catch (e) {
-          console.error('Error stopping media stream tracks during unmount:', e)
-        }
+        try { mediaStreamRef.current.getTracks().forEach(track => track.stop()) } catch (e) {}
         mediaStreamRef.current = null
       }
     }
@@ -223,55 +213,70 @@ export default function InterviewPage() {
           setLiveTranscript(interim || '')
         },
         onEnd: (final) => {
-          if (isRecordingRef.current) {
-            // Speech recognition stopped automatically due to silence/timeout. Let's restart it!
+          if (isRecordingRef.current && !stopSpeechRecognitionRef.current) {
+            // Speech recognition stopped automatically (silence/timeout/network).
+            // Accumulate any partial transcript then restart.
             if (final) {
               accumulatedTranscriptRef.current = (accumulatedTranscriptRef.current + ' ' + final).trim()
               setFinalTranscript(accumulatedTranscriptRef.current)
             }
             setLiveTranscript('')
-            
+
             console.log('Speech recognition ended automatically. Restarting in 200ms...')
             setTimeout(() => {
-              if (isRecordingRef.current && recognitionRef.current) {
+              if (isRecordingRef.current && !stopSpeechRecognitionRef.current && recognitionRef.current) {
                 try {
                   startRecognition(recognitionRef.current)
+                  // Reset network error counter on successful restart
+                  networkErrorCountRef.current = 0
                 } catch (err) {
                   console.error('Failed to restart speech recognition:', err)
                 }
               }
             }, 200)
           } else {
-            // Intentionally stopped
+            // Intentionally stopped (or fallback mode — just clean up)
             if (final) {
               const fullFinal = (accumulatedTranscriptRef.current + ' ' + final).trim()
               setFinalTranscript(fullFinal)
             }
             setLiveTranscript('')
-            setAvatarState(AVATAR_STATES.IDLE)
-            setIsRecording(false)
-            
+            if (!stopSpeechRecognitionRef.current) {
+              setAvatarState(AVATAR_STATES.IDLE)
+              setIsRecording(false)
+            }
+
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
               mediaRecorderRef.current.stop()
             }
           }
         },
         onError: (err) => {
-          console.error('Speech recognition error:', err)
-          
-          const criticalErrors = ['not-allowed', 'audio-capture', 'service-not-allowed', 'network']
+          console.warn('Speech recognition error:', err)
+
+          // 'network' = Google/Azure speech API unreachable (common on Brave, Edge).
+          // Don't kill the session — count failures and fall back gracefully.
+          if (err === 'network') {
+            networkErrorCountRef.current += 1
+            if (networkErrorCountRef.current >= 3 && !stopSpeechRecognitionRef.current) {
+              stopSpeechRecognitionRef.current = true
+              setSpeechFallback(true)
+              console.warn('Speech recognition disabled after 3 network errors — using recorder-only mode')
+            }
+            return
+          }
+
+          const criticalErrors = ['not-allowed', 'audio-capture', 'service-not-allowed']
           if (criticalErrors.includes(err)) {
             isRecordingRef.current = false
             setIsRecording(false)
             setAvatarState(AVATAR_STATES.IDLE)
-            
+
             let errMsg = `Speech recognition error: ${err}`
             if (err === 'not-allowed') {
-              errMsg = 'Microphone permission was denied, or the page is not running over a secure connection (HTTPS). On mobile devices, browsers restrict microphone access and speech APIs to secure origins (HTTPS/localhost). Please enable permissions and use HTTPS.'
+              errMsg = 'Microphone permission was denied, or the page is not running over HTTPS. Please enable microphone access and reload.'
             } else if (err === 'audio-capture') {
-              errMsg = 'Could not access your microphone. Please check if another application or browser tab is using it.'
-            } else if (err === 'network') {
-              errMsg = 'Network connection lost. Speech recognition requires an active internet connection.'
+              errMsg = 'Could not access your microphone. Please check if another app is using it.'
             }
             alert(errMsg)
           }
@@ -305,6 +310,7 @@ export default function InterviewPage() {
         })
         .catch(err => {
           console.error('Failed to start audio recording:', err)
+          // Start recognition anyway without MediaRecorder
           startRecognition(recognitionRef.current)
         })
     }
@@ -587,6 +593,19 @@ export default function InterviewPage() {
                 <p className="text-white font-bold text-lg">Generating Your Report...</p>
                 <p className="text-gray-400 text-sm mt-2">Analyzing your performance across all questions</p>
               </Card>
+            )}
+
+            {/* Speech fallback warning (Brave/Edge network block) */}
+            {speechFallback && isRecording && (
+              <div className="flex items-start gap-3 bg-amber-900/20 border border-amber-500/30 rounded-2xl px-4 py-3 text-amber-300 text-sm animate-fade-in">
+                <span className="text-lg leading-none mt-0.5">⚠️</span>
+                <div>
+                  <p className="font-semibold">Live transcription unavailable</p>
+                  <p className="text-amber-400/80 text-xs mt-0.5">
+                    Your browser blocked the speech recognition service. Your microphone is still recording — click <strong>Stop Recording</strong> when done and your audio will be transcribed automatically.
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* Transcript */}
