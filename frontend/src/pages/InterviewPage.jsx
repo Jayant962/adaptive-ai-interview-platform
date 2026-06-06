@@ -15,7 +15,8 @@ import {
 import {
   createSpeechRecognition, startRecognition, stopRecognition,
   abortRecognition, speakText, stopSpeaking, loadVoices,
-  isSpeechRecognitionSupported, transcribeAudioBlob
+  isSpeechRecognitionSupported, transcribeAudioBlob,
+  createCompatibleMediaRecorder
 } from '../services/speech'
 import AvatarPanel from '../components/interview/AvatarPanel'
 import RecordingControls from '../components/interview/RecordingControls'
@@ -51,6 +52,7 @@ export default function InterviewPage() {
   const mediaRecorderRef = useRef(null)
   const mediaStreamRef = useRef(null)
   const audioChunksRef = useRef([])
+  const audioExtensionRef = useRef('webm')   // tracks negotiated format for transcription
   const answerStartTime = useRef(null)
   const isRecordingRef = useRef(false)
   const accumulatedTranscriptRef = useRef('')
@@ -154,7 +156,8 @@ export default function InterviewPage() {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
           mediaStreamRef.current = stream
-          const mediaRecorder = new MediaRecorder(stream)
+          const { mediaRecorder, mimeType, extension } = createCompatibleMediaRecorder(stream)
+          audioExtensionRef.current = extension
           mediaRecorderRef.current = mediaRecorder
           audioChunksRef.current = []
 
@@ -165,7 +168,7 @@ export default function InterviewPage() {
           }
 
           mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' })
             const url = URL.createObjectURL(audioBlob)
             setAudioUrl(url)
 
@@ -175,7 +178,7 @@ export default function InterviewPage() {
             setTranscribing(true)
             try {
               const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-              const transcript = await transcribeAudioBlob(audioBlob, rawApiUrl)
+              const transcript = await transcribeAudioBlob(audioBlob, rawApiUrl, audioExtensionRef.current)
               setFinalTranscript(transcript)
               setPhase(INTERVIEW_PHASES.RECORDING)
               setAvatarState(AVATAR_STATES.LISTENING)
@@ -278,7 +281,8 @@ export default function InterviewPage() {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
           mediaStreamRef.current = stream
-          const mediaRecorder = new MediaRecorder(stream)
+          const { mediaRecorder, mimeType, extension } = createCompatibleMediaRecorder(stream)
+          audioExtensionRef.current = extension
           mediaRecorderRef.current = mediaRecorder
           audioChunksRef.current = []
 
@@ -289,7 +293,7 @@ export default function InterviewPage() {
           }
 
           mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' })
             const url = URL.createObjectURL(audioBlob)
             setAudioUrl(url)
             stream.getTracks().forEach(track => track.stop())

@@ -24,9 +24,11 @@ export function DataProvider({ children }) {
   const [overallReport, setOverallReport]   = useState(null)
 
   // ── Per-resource loading flags ─────────────────────────────────────────────
-  const [analyticsLoading, setAnalyticsLoading]     = useState(true)
-  const [historyLoading, setHistoryLoading]          = useState(true)
-  const [reportLoading, setReportLoading]            = useState(true)
+  // Start as false — they become true only when a real fetch is in-flight.
+  // This prevents pages from showing a spinner before syncComplete fires.
+  const [analyticsLoading, setAnalyticsLoading]     = useState(false)
+  const [historyLoading, setHistoryLoading]          = useState(false)
+  const [reportLoading, setReportLoading]            = useState(false)
 
   // Prevent double-fetch if effect fires twice (React StrictMode)
   const prefetchedRef = useRef(false)
@@ -77,11 +79,18 @@ export function DataProvider({ children }) {
   }
 
   const prefetchAll = async () => {
+    // Mark all resources as loading before fetches begin
+    setAnalyticsLoading(true)
+    setHistoryLoading(true)
+    setReportLoading(true)
     try {
       const token = await getAuthToken()
       await fetchIndependent(token)
     } catch (err) {
       console.error('[DataContext] Prefetch error:', err)
+      setAnalyticsLoading(false)
+      setHistoryLoading(false)
+      setReportLoading(false)
     }
   }
 
@@ -109,9 +118,9 @@ export function DataProvider({ children }) {
       setAnalytics(null)
       setHistory([])
       setOverallReport(null)
-      setAnalyticsLoading(true)
-      setHistoryLoading(true)
-      setReportLoading(true)
+      setAnalyticsLoading(false)
+      setHistoryLoading(false)
+      setReportLoading(false)
       prefetchedRef.current = false
     }
   }, [isSignedIn])

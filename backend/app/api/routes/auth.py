@@ -64,17 +64,15 @@ async def sync_user(
     away from the signup page back to login.
     """
     if user_data.is_signup:
-        # Prevent existing users from signing up (allow developer demo user to bypass)
-        is_demo = user_data.clerk_user_id == "user_2N5e4B9q8Z3w2x1y0v9u8t7s6r"
-        if not is_demo:
-            existing_user = db.query(User).filter(
-                (User.clerk_user_id == user_data.clerk_user_id) | (User.email == user_data.email)
-            ).first()
-            if existing_user:
-                raise HTTPException(
-                    status_code=400,
-                    detail="User already registered. Please log in."
-                )
+        # Prevent existing users from signing up
+        existing_user = db.query(User).filter(
+            (User.clerk_user_id == user_data.clerk_user_id) | (User.email == user_data.email)
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="User already registered. Please log in."
+            )
 
     user, is_new_user = get_or_create_user(
         db=db,

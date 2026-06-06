@@ -32,9 +32,9 @@ function Navbar() {
 
           <div className="flex items-center gap-3">
             {isSignedIn ? (
-              <Link to="/dashboard">
+              <Link to="/interview/setup">
                 <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
-                  Go to Dashboard
+                  Start Interview
                 </button>
               </Link>
             ) : (
@@ -92,9 +92,9 @@ function Hero() {
           </p>
 
           <div className="flex flex-wrap gap-4">
-            <Link to={isSignedIn ? '/dashboard' : '/signup'}>
+            <Link to={isSignedIn ? '/interview/setup' : '/signup'}>
               <button className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-4 rounded-xl transition-all shadow-lg shadow-primary-900/40 text-base">
-                Get Started Free
+                {isSignedIn ? 'Start Interview' : 'Get Started Free'}
                 <ArrowRight size={18} />
               </button>
             </Link>
@@ -273,6 +273,7 @@ function HowItWorks() {
 
 // ─── Categories ───────────────────────────────────────────
 function Categories() {
+  const { isSignedIn } = useUser()
   const categories = [
     { name: 'Data Science', tag: 'Popular' },
     { name: 'Machine Learning', tag: 'Popular' },
@@ -296,7 +297,7 @@ function Categories() {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {categories.map(({ name, tag }) => (
-          <Link to="/signup" key={name}>
+          <Link to={isSignedIn ? '/interview/setup' : '/signup'} key={name}>
             <div className="bg-dark-700/60 border border-white/8 hover:border-primary-500/30 rounded-2xl p-5 text-center transition-all hover:scale-[1.02] group">
               <p className="text-white font-semibold text-sm group-hover:text-primary-300 transition-colors">{name}</p>
               {tag && (
@@ -362,9 +363,9 @@ function CTA() {
         <p className="text-gray-400 text-lg mb-10">
           Join thousands of students and professionals who are preparing smarter with AI-powered mock interviews.
         </p>
-        <Link to={isSignedIn ? '/dashboard' : '/signup'}>
+        <Link to={isSignedIn ? '/interview/setup' : '/signup'}>
           <button className="inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-white font-bold px-10 py-5 rounded-2xl text-lg transition-all shadow-2xl shadow-primary-900/50">
-            Start Practicing Free
+            {isSignedIn ? 'Start Interview Now' : 'Start Practicing Free'}
             <ArrowRight size={20} />
           </button>
         </Link>

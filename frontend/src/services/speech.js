@@ -1,8 +1,42 @@
 /**
  * Speech Service
  * Browser Web Speech API - Speech Recognition (STT) + Speech Synthesis (TTS)
- * No external libraries needed - built into modern browsers.
+ * Compatible with Chrome, Edge, Brave, Firefox, and Safari.
  */
+
+// ─────────────────────────────────────────────
+// MIME TYPE NEGOTIATION
+// ─────────────────────────────────────────────
+
+/**
+ * Returns the best supported audio MIME type for MediaRecorder, plus the
+ * file extension to use when uploading so the backend knows the format.
+ */
+export function getBestAudioMimeType() {
+  const candidates = [
+    'audio/webm;codecs=opus',   // Chrome, Edge, Brave (Chromium)
+    'audio/webm',               // Chromium fallback (no codec hint)
+    'audio/ogg;codecs=opus',    // Firefox
+    'audio/mp4;codecs=mp4a',    // Safari 15+
+    'audio/mp4',                // Safari older
+    '',                         // Let the browser decide (last resort)
+  ]
+
+  for (const mime of candidates) {
+    if (!mime || MediaRecorder.isTypeSupported(mime)) {
+      return { mimeType: mime || undefined, extension: mimeToExtension(mime) }
+    }
+  }
+
+  return { mimeType: undefined, extension: 'webm' } // should never happen
+}
+
+function mimeToExtension(mime) {
+  if (!mime) return 'webm'
+  if (mime.startsWith('audio/ogg')) return 'ogg'
+  if (mime.startsWith('audio/mp4')) return 'mp4'
+  return 'webm'
+}
 
 // ─────────────────────────────────────────────
 // SPEECH RECOGNITION (Speech-to-Text)
@@ -18,7 +52,7 @@ export function createSpeechRecognition({ onResult, onEnd, onError, onStart }) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 
   if (!SpeechRecognition) {
-    onError?.('Speech recognition is not supported in this browser. Please use Chrome.')
+    onError?.('Speech recognition is not supported in this browser. Please use Chrome or Edge.')
     return null
   }
 
@@ -62,8 +96,8 @@ export function createSpeechRecognition({ onResult, onEnd, onError, onStart }) {
   }
 
   recognition.onerror = (event) => {
-    if (event.error === 'no-speech') return // Ignore no-speech errors
-    if (event.error === 'aborted') return    // Ignore intentional stops
+    if (event.error === 'no-speech') return  // Ignore no-speech errors
+    if (event.error === 'aborted') return     // Ignore intentional stops
     onError?.(event.error)
   }
 
@@ -106,7 +140,9 @@ let currentAudio = null
 let audioContext = null
 let analyser = null
 let dataArray = null
-let sourceNode = null
+// Track which audio element is connected to the AudioContext source node
+// so we never try to re-connect the same element (throws in non-Chrome browsers).
+let connectedAudioElement = null
 let currentVolume = 0
 let volumeInterval = null
 
@@ -138,19 +174,25 @@ function setupAudioAnalyzer(audioElement) {
       dataArray = new Uint8Array(bufferLength)
     }
 
-    if (sourceNode) {
+    // Only create a new MediaElementSource if this is a different audio element.
+    // Re-connecting the same element throws InvalidStateError in Brave/Edge/Firefox.
+    if (connectedAudioElement !== audioElement) {
       try {
-        sourceNode.disconnect()
-      } catch (e) {}
+        const sourceNode = audioContext.createMediaElementSource(audioElement)
+        sourceNode.connect(analyser)
+        analyser.connect(audioContext.destination)
+        connectedAudioElement = audioElement
+      } catch (e) {
+        // createMediaElementSource can throw if the element was already connected
+        // by a previous AudioContext. Fall back gracefully — volume stays at 0.
+        console.warn('AudioContext source already connected, skipping analyzer:', e)
+        connectedAudioElement = audioElement // avoid retrying
+      }
     }
-
-    sourceNode = audioContext.createMediaElementSource(audioElement)
-    sourceNode.connect(analyser)
-    analyser.connect(audioContext.destination)
 
     updateVolumeLoop()
   } catch (e) {
-    console.warn("Failed to setup Web Audio API analyzer:", e)
+    console.warn('Failed to setup Web Audio API analyzer:', e)
   }
 }
 
@@ -180,7 +222,6 @@ function updateVolumeLoop() {
         sum += dataArray[i]
       }
       const average = sum / dataArray.length
-      // Scale average volume to 0.0 - 1.0 range
       currentVolume = average / 128.0
     } else {
       currentVolume = 0
@@ -205,8 +246,17 @@ export function speakText(text, { onStart, onEnd, onError } = {}) {
   const API_URL = rawApiUrl.replace(/\/$/, '')
   const url = `${API_URL}/api/interview/tts?text=${encodeURIComponent(text.trim())}`
 
-  const audio = new Audio(url)
-  audio.crossOrigin = "anonymous"
+  const audio = new Audio()
+  // Only set crossOrigin when the TTS endpoint is on a different origin.
+  // Brave's strict fingerprinting protection can reject crossOrigin on same-origin
+  // requests, causing CORS errors even when the server allows it.
+  const isSameOrigin = url.startsWith(window.location.origin) ||
+    url.startsWith('http://localhost') ||
+    url.startsWith('http://127.0.0.1')
+  if (!isSameOrigin) {
+    audio.crossOrigin = 'anonymous'
+  }
+  audio.src = url
   currentAudio = audio
 
   audio.onplay = () => {
@@ -221,7 +271,7 @@ export function speakText(text, { onStart, onEnd, onError } = {}) {
   }
 
   audio.onerror = (e) => {
-    console.error('Edge TTS playback error:', e)
+    console.error('TTS playback error:', e)
     currentAudio = null
     cleanupAudioAnalyzer()
     onError?.(e)
@@ -257,9 +307,32 @@ export function loadVoices() {
   return Promise.resolve([])
 }
 
-export async function transcribeAudioBlob(blob, apiUrl) {
+/**
+ * Creates a MediaRecorder with the best available audio codec for this browser.
+ * Returns { mediaRecorder, mimeType, extension } so callers know what format was chosen.
+ */
+export function createCompatibleMediaRecorder(stream) {
+  const { mimeType, extension } = getBestAudioMimeType()
+
+  let mediaRecorder
+  try {
+    mediaRecorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream)
+  } catch (e) {
+    // If the explicit mimeType failed, fall back to browser default
+    console.warn(`MediaRecorder with mimeType "${mimeType}" failed, using default:`, e)
+    mediaRecorder = new MediaRecorder(stream)
+    return { mediaRecorder, mimeType: undefined, extension: 'webm' }
+  }
+
+  return { mediaRecorder, mimeType, extension }
+}
+
+export async function transcribeAudioBlob(blob, apiUrl, extension = 'webm') {
   const formData = new FormData()
-  formData.append('audio', blob, 'audio.webm')
+  // Use the actual extension so the backend (Whisper) knows the format
+  formData.append('audio', blob, `audio.${extension}`)
 
   const cleanApiUrl = apiUrl.replace(/\/$/, '')
   const response = await fetch(`${cleanApiUrl}/api/interview/transcribe`, {
