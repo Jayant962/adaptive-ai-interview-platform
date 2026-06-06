@@ -1,3 +1,3 @@
-from app.api.routes import auth, interview, reports
+from app.api.routes import auth, interview, reports, contact
 
-__all__ = ["auth", "interview", "reports"]
+__all__ = ["auth", "interview", "reports", "contact"]

@@ -163,42 +163,38 @@ class AvatarErrorBoundary extends React.Component {
 // ─── Camera — tight portrait crop (face + top of shoulders only) ─────────────
 function CameraController({ modelScene, onSetupComplete }) {
   const { camera } = useThree()
-  const initialHeadYRef = useRef(1.45) // Default fallback height
 
   useEffect(() => {
     if (!modelScene) return
     modelScene.updateMatrixWorld(true)
+
     let headBone = null
     modelScene.traverse((child) => {
       if (child.isBone && child.name === 'Head') headBone = child
     })
+
     const headPos = new THREE.Vector3()
+    let headY = 1.45
+
     if (headBone) {
       headBone.getWorldPosition(headPos)
-      initialHeadYRef.current = headPos.y
+      headY = headPos.y
     } else {
       const box = new THREE.Box3().setFromObject(modelScene)
       const size = box.getSize(new THREE.Vector3())
-      initialHeadYRef.current = box.max.y - size.y * 0.08
+      headY = box.max.y - size.y * 0.08
     }
-    if (onSetupComplete) onSetupComplete(new THREE.Vector3(0, initialHeadYRef.current - 0.05, 0))
-  }, [modelScene, onSetupComplete])
 
-  useFrame(() => {
-    if (!modelScene) return
-
-    // Wide portrait crop showing full shoulders and lower chest to match sample image
-    const camZ = window.camZ !== undefined ? window.camZ : 1.18
-    const camYOffset = window.camYOffset !== undefined ? window.camYOffset : -0.05
-    const lookAtYOffset = window.lookAtYOffset !== undefined ? window.lookAtYOffset : -0.14
-    const camFov = window.camFov !== undefined ? window.camFov : 34
-
-    camera.position.set(0, initialHeadYRef.current + camYOffset, camZ)
-    camera.lookAt(new THREE.Vector3(0, initialHeadYRef.current + lookAtYOffset, 0))
-    camera.fov = camFov
+    // Set camera ONCE — not in useFrame
+    camera.position.set(0, headY - 0.05, 1.18)
+    camera.lookAt(new THREE.Vector3(0, headY - 0.14, 0))
+    camera.fov = 34
     camera.updateProjectionMatrix()
-  })
 
+    if (onSetupComplete) onSetupComplete(new THREE.Vector3(0, headY - 0.05, 0))
+  }, [modelScene, camera, onSetupComplete])
+
+  // No useFrame at all — camera stays fixed
   return null
 }
 

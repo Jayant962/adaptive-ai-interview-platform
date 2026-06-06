@@ -20,7 +20,7 @@ logger = logging.getLogger("app.api.auth")
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
-def send_welcome_email_background(user_id: int):
+async def send_welcome_email_background(user_id: int):
     """
     Background task to send a welcome email to the user.
     Only updates welcome_email_sent to True if the email is successfully sent.
@@ -36,7 +36,7 @@ def send_welcome_email_background(user_id: int):
             logger.warning(f"User ID {user_id} does not have a valid email: {user.email}")
             return
 
-        success = send_welcome_email(user.email, user.name)
+        success = await send_welcome_email(user.email, user.name)
         if success:
             user.welcome_email_sent = True
             db.commit()
@@ -87,7 +87,7 @@ async def sync_user(
         is_serverless = os.environ.get("VERCEL") is not None or os.environ.get("AWS_EXECUTION_ENV") is not None
         if is_serverless:
             logger.info("Serverless env detected — sending welcome email synchronously.")
-            send_welcome_email_background(user.id)
+            await send_welcome_email_background(user.id)
         else:
             background_tasks.add_task(send_welcome_email_background, user.id)
 
@@ -145,7 +145,7 @@ async def test_email_sync(
     if not current_user.email or "@" not in current_user.email:
         raise HTTPException(status_code=400, detail="User has no valid email address")
     
-    success = send_welcome_email(current_user.email, current_user.name)
+    success = await send_welcome_email(current_user.email, current_user.name)
     if success:
         return {
             "status": "success",

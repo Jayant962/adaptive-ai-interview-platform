@@ -23,25 +23,37 @@
   --clerk-input-text: #e2e8f0;
 }
 
+/* ────────────────────────────────────────────────────────────
+   LIGHT MODE — warm indigo/violet-tinted palette
+   Cohesive with the purple primary color scheme.
+   ──────────────────────────────────────────────────────────── */
 html:not(.dark) {
-  --color-white: 15 23 42;
-  --color-gray-300: 71 85 105;
-  --color-gray-400: 71 85 105;
-  --color-gray-500: 100 116 139;
+  /* Primary text → deep indigo */
+  --color-white: 30 27 75;
 
-  --color-dark-900: 248 250 252;
-  --color-dark-800: 255 255 255;
-  --color-dark-700: 241 245 249;
-  --color-dark-600: 226 232 240;
-  --color-dark-500: 203 213 225;
-  --color-dark-400: 148 163 184;
-  --color-dark-300: 203 213 225;
+  /* Secondary text shades */
+  --color-gray-300: 109 105 167;
+  --color-gray-400: 99 95 155;
+  --color-gray-500: 107 114 128;
+
+  /* Background scale — lavender-tinted whites */
+  --color-dark-900: 246 245 255;   /* page bg  — warm lavender-white */
+  --color-dark-800: 255 255 255;   /* card bg  — pure white          */
+  --color-dark-700: 237 234 255;   /* section  — soft violet tint    */
+  --color-dark-600: 221 216 254;   /* divider  — muted indigo        */
+  --color-dark-500: 196 190 245;   /* borders                        */
+  --color-dark-400: 163 155 220;   /* placeholder / disabled bg      */
+  --color-dark-300: 212 208 252;   /* subtle borders                 */
 
   --clerk-bg: #ffffff;
-  --clerk-text: #0f172a;
-  --clerk-text-secondary: #475569;
-  --clerk-input-bg: #f1f5f9;
-  --clerk-input-text: #0f172a;
+  --clerk-text: #1e1b4b;
+  --clerk-text-secondary: #6b7280;
+  --clerk-input-bg: #f6f5ff;
+  --clerk-input-text: #1e1b4b;
+}
+
+html:not(.dark) .bg-hero-gradient {
+  background-image: linear-gradient(135deg, #f0edff 0%, #e6e3ff 50%, #dcd8ff 100%) !important;
 }
 
 @layer base {
@@ -64,21 +76,31 @@ html:not(.dark) {
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Dark mode scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
   }
-
   ::-webkit-scrollbar-track {
     background: #111118;
   }
-
   ::-webkit-scrollbar-thumb {
     background: #353550;
     border-radius: 3px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
     background: #4e38b9;
+  }
+
+  /* Light mode scrollbar overrides */
+  html:not(.dark) ::-webkit-scrollbar-track {
+    background: #eeecff;
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: #a5b4fc;
+    border-radius: 3px;
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: #6d5fe8;
   }
 }
 
@@ -172,15 +194,75 @@ html:not(.dark) {
     box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
   }
 
-  /* Make sure any elements inside a primary/danger/status bg stay white in light mode */
+  /* ─── LIGHT MODE OVERRIDES ──────────────────────────────── */
+
+  /* Colored buttons always keep white text */
   html:not(.dark) .bg-primary-600,
   html:not(.dark) .bg-primary-600 *,
   html:not(.dark) .bg-primary-700,
-  html:not(.dark) .bg-primary-700 *,
+  html:not(.dark) .bg-primary-700 * {
+    color: #ffffff !important;
+  }
   html:not(.dark) .bg-red-600,
-  html:not(.dark) .bg-red-600 *,
+  html:not(.dark) .bg-red-600 * {
+    color: #ffffff !important;
+  }
   html:not(.dark) .bg-green-600,
   html:not(.dark) .bg-green-600 * {
     color: #ffffff !important;
+  }
+
+  /* Glass cards → clean white surface + soft indigo shadow */
+  html:not(.dark) .glass-card {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-color: rgba(109, 95, 232, 0.14) !important;
+    box-shadow: 0 2px 8px rgba(109, 95, 232, 0.08), 0 1px 2px rgba(0,0,0,0.04) !important;
+  }
+
+  /* Input fields in light mode */
+  html:not(.dark) .input-field {
+    background: #ffffff !important;
+    border-color: rgba(109, 95, 232, 0.22) !important;
+    color: #1e1b4b !important;
+  }
+  html:not(.dark) .input-field::placeholder {
+    color: #9ca3af !important;
+  }
+  html:not(.dark) .input-field:focus {
+    border-color: #6d5fe8 !important;
+    box-shadow: 0 0 0 3px rgba(109, 95, 232, 0.12) !important;
+  }
+
+  /* Score colors — darker shades for light-bg readability */
+  html:not(.dark) .score-excellent { color: #059669 !important; }
+  html:not(.dark) .score-good      { color: #2563eb !important; }
+  html:not(.dark) .score-average   { color: #d97706 !important; }
+  html:not(.dark) .score-poor      { color: #dc2626 !important; }
+
+  /* Gradient text stays vivid on light bg */
+  html:not(.dark) .gradient-text {
+    background: linear-gradient(135deg, #5c46d3, #7c3aed) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+  }
+
+  /* Amber warning banners */
+  html:not(.dark) .bg-amber-900\/20 {
+    background: rgba(254, 243, 199, 0.95) !important;
+    border-color: rgba(245, 158, 11, 0.35) !important;
+  }
+  html:not(.dark) .text-amber-300 { color: #b45309 !important; }
+  html:not(.dark) .text-amber-400\/80 { color: #92400e !important; }
+
+  /* Follow-up badge bg in light mode */
+  html:not(.dark) .bg-primary-900\/40 {
+    background: rgba(109, 95, 232, 0.1) !important;
+  }
+  html:not(.dark) .bg-primary-600\/20 {
+    background: rgba(109, 95, 232, 0.1) !important;
+  }
+  html:not(.dark) .bg-primary-600\/40 {
+    background: rgba(109, 95, 232, 0.18) !important;
   }
 }

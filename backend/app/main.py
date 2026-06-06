@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database.connection import create_tables
-from app.api.routes import auth, interview, reports
+from app.api.routes import auth, interview, reports, contact
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(interview.router)
 app.include_router(reports.router)
+app.include_router(contact.router)
 
 
 @app.get("/")

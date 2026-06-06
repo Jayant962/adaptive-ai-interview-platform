@@ -404,25 +404,66 @@ def generate_follow_up(
             "follow_up_question": None,
             "reason": f"Maximum follow-ups ({max_follow_ups}) reached for {difficulty} difficulty",
         }
-
     if is_mock_mode:
-        if len(user_answer.strip()) < 40:
+        user_answer_clean = user_answer.strip()
+        user_answer_lower = user_answer_clean.lower()
+        
+        # If very brief answer, ask for elaboration or code sample
+        if len(user_answer_clean) < 45:
+            # Try to extract a meaningful word to make it sound custom
+            words = re.findall(r'[a-zA-Z]{4,}', user_answer_lower)
+            ignored_words = {
+                "explain", "difference", "concept", "because", "without", "through", 
+                "really", "actually", "something", "sometimes", "another", "between",
+                "should", "would", "could", "about", "their", "there", "these", "those",
+                "which", "where", "while", "using", "under", "above", "below", "other"
+            }
+            probing_topics = [w for w in words if w not in ignored_words]
+            probe_word = probing_topics[0] if probing_topics else "that approach"
             return {
                 "generate_follow_up": True,
-                "follow_up_question": "That's a very brief summary. Could you explain in more detail or provide a specific code or design example of how you would implement this in practice?",
+                "follow_up_question": f"That's a very brief summary about '{probe_word}'. Could you explain in more detail or provide a specific code or design example of how you would implement this in practice?",
                 "reason": "Answer was too brief.",
             }
-        
-        words = user_answer.lower().split()
-        probing_topics = [w for w in words if len(w) > 5 and w not in ["explain", "difference", "concept", "because", "without", "through", "really", "actually"]]
-        probe_word = probing_topics[0] if probing_topics else "this approach"
-        
-        follow_up_q = f"You mentioned '{probe_word}'. Could you elaborate on how that works under the hood and what trade-offs you have to consider when using it?"
-        
+
+        # Look for specific topic matches
+        performance_terms = ["usememo", "usecallback", "virtual dom", "reconciliation", "indexing", "cache", "memoization", "lazy loading", "suspense", "optimize"]
+        state_db_terms = ["redux", "context", "zustand", "sql", "postgresql", "mongodb", "nosql", "database", "orm", "prisma", "sqlalchemy", "state management", "schema"]
+        web_api_terms = ["rest", "graphql", "websocket", "fastapi", "express", "api", "middleware", "endpoint", "async/await", "promise", "closure", "callback", "http"]
+
+        matched_perf = next((t for t in performance_terms if t in user_answer_lower), None)
+        matched_state = next((t for t in state_db_terms if t in user_answer_lower), None)
+        matched_api = next((t for t in web_api_terms if t in user_answer_lower), None)
+
+        if matched_perf:
+            follow_up_q = f"You mentioned '{matched_perf}'. While optimization is great, it introduces computational or memory overhead. Can you explain the cost of using it and specify a scenario where it might actually hurt performance?"
+            reason = "Probing performance trade-offs."
+        elif matched_state:
+            follow_up_q = f"Since you brought up '{matched_state}', how does it compare to its main alternatives in terms of scalability, complexity, or data consistency? When would you choose one over the other?"
+            reason = "Probing state/DB architecture alternatives."
+        elif matched_api:
+            follow_up_q = f"You talked about '{matched_api}'. What is the biggest challenge or common pitfall developers run into when implementing or debugging this concept in production, and how do you prevent it?"
+            reason = "Probing API/implementation pitfalls."
+        else:
+            # Fallback keyword extraction
+            words = re.findall(r'[a-zA-Z]{5,}', user_answer_lower)
+            ignored_words = {
+                "explain", "difference", "concept", "because", "without", "through", 
+                "really", "actually", "something", "sometimes", "another", "between",
+                "should", "would", "could", "about", "their", "there", "these", "those",
+                "which", "where", "while", "using", "under", "above", "below", "other",
+                "understand", "implement", "problem", "solution", "project", "system"
+            }
+            probing_topics = [w for w in words if w not in ignored_words]
+            probe_word = probing_topics[0] if probing_topics else "this concept"
+            
+            follow_up_q = f"You highlighted the role of '{probe_word}'. Could you elaborate on how this functions under the hood and walk me through the key architectural trade-offs you have to consider when using it?"
+            reason = "Probing deeper into extracted technical keyword."
+
         return {
             "generate_follow_up": True,
             "follow_up_question": follow_up_q,
-            "reason": "Probing deeper into user's answer.",
+            "reason": reason,
         }
 
     prompt = FOLLOW_UP_GENERATION_PROMPT.format(

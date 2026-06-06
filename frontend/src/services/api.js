@@ -52,6 +52,13 @@ export async function sendTestEmail(token) {
   return apiFetch('/api/auth/test-email', { method: 'POST' }, token)
 }
 
+export async function sendContactMessage(name, email, message) {
+  return apiFetch('/api/contact', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, message }),
+  })
+}
+
 // ─────────────────────────────────────────────
 // INTERVIEW
 // ─────────────────────────────────────────────

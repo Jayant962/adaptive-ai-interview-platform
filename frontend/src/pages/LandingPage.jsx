@@ -6,18 +6,18 @@ import {
   ChevronDown, Star, ArrowRight, Play, Check, Mic,
   Target, TrendingUp, Award, Users
 } from 'lucide-react'
+import { sendContactMessage } from '../services/api'
 
 // ─── Navbar ───────────────────────────────────────────────
 function Navbar() {
   const { isSignedIn } = useUser()
-  const [menuOpen, setMenuOpen] = useState(false)
   return (
     <nav className="fixed top-0 inset-x-0 z-50 bg-dark-900/80 backdrop-blur-md border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <Zap size={16} className="text-white" />
+              <Zap size={16} className="text-rawWhite" />
             </div>
             <span className="text-white font-bold text-lg">AI Interviewer</span>
           </div>
@@ -33,7 +33,7 @@ function Navbar() {
           <div className="flex items-center gap-3">
             {isSignedIn ? (
               <Link to="/interview/setup">
-                <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                <button className="bg-primary-600 hover:bg-primary-700 text-rawWhite text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
                   Start Interview
                 </button>
               </Link>
@@ -45,7 +45,7 @@ function Navbar() {
                   </button>
                 </Link>
                 <Link to="/signup">
-                  <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                  <button className="bg-primary-600 hover:bg-primary-700 text-rawWhite text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
                     Get Started Free
                   </button>
                 </Link>
@@ -93,7 +93,7 @@ function Hero() {
 
           <div className="flex flex-wrap gap-4">
             <Link to={isSignedIn ? '/interview/setup' : '/signup'}>
-              <button className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-4 rounded-xl transition-all shadow-lg shadow-primary-900/40 text-base">
+              <button className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-rawWhite font-semibold px-8 py-4 rounded-xl transition-all shadow-lg shadow-primary-900/40 text-base">
                 {isSignedIn ? 'Start Interview' : 'Get Started Free'}
                 <ArrowRight size={18} />
               </button>
@@ -106,21 +106,13 @@ function Hero() {
             </a>
           </div>
 
-          {/* Social proof */}
-          <div className="flex items-center gap-6 pt-2">
-            <div className="flex -space-x-2">
-              {['A','B','C','D'].map((l,i) => (
-                <div key={i} className="w-8 h-8 rounded-full bg-primary-700 border-2 border-dark-900 flex items-center justify-center text-xs font-bold text-white">
-                  {l}
-                </div>
-              ))}
-            </div>
-            <div>
-              <div className="flex items-center gap-1 mb-0.5">
-                {[...Array(5)].map((_,i) => <Star key={i} size={12} className="text-yellow-400 fill-yellow-400" />)}
-              </div>
-              <p className="text-xs text-gray-400">10K+ happy users</p>
-            </div>
+          {/* Live Indicator replace fake proof */}
+          <div className="flex items-center gap-2.5 pt-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+            </span>
+            <span className="text-xs text-gray-400 font-medium tracking-wide uppercase">Ready to practice online 24/7</span>
           </div>
         </div>
 
@@ -151,10 +143,10 @@ function Hero() {
 // ─── Stats ────────────────────────────────────────────────
 function Stats() {
   const stats = [
-    { value: '10K+', label: 'Interviews Conducted' },
-    { value: '95%',  label: 'User Satisfaction' },
-    { value: '30+',  label: 'Topic Categories' },
+    { value: '30+', label: 'Topic Categories' },
     { value: '3',    label: 'Difficulty Levels' },
+    { value: '5-8',  label: 'Questions Per Session' },
+    { value: 'Real-time', label: 'Evaluation & Feedback' },
   ]
   return (
     <section className="py-16 bg-dark-800/50 border-y border-white/5">
@@ -364,7 +356,7 @@ function CTA() {
           Join thousands of students and professionals who are preparing smarter with AI-powered mock interviews.
         </p>
         <Link to={isSignedIn ? '/interview/setup' : '/signup'}>
-          <button className="inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-white font-bold px-10 py-5 rounded-2xl text-lg transition-all shadow-2xl shadow-primary-900/50">
+          <button className="inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-rawWhite font-bold px-10 py-5 rounded-2xl text-lg transition-all shadow-2xl shadow-primary-900/50">
             {isSignedIn ? 'Start Interview Now' : 'Start Practicing Free'}
             <ArrowRight size={20} />
           </button>
@@ -375,29 +367,208 @@ function CTA() {
 }
 
 // ─── Footer ───────────────────────────────────────────────
-function Footer() {
+function Footer({ onOpenModal }) {
   return (
     <footer className="border-t border-white/5 py-12">
       <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center">
-            <Zap size={13} className="text-white" />
+            <Zap size={13} className="text-rawWhite" />
           </div>
           <span className="text-white font-bold">AI Interviewer</span>
         </div>
         <p className="text-gray-500 text-sm">© 2024 AI Interviewer. Built for students, by students.</p>
         <div className="flex gap-6 text-sm text-gray-500">
-          <a href="#" className="hover:text-white transition-colors">Privacy</a>
-          <a href="#" className="hover:text-white transition-colors">Terms</a>
-          <a href="#" className="hover:text-white transition-colors">Contact</a>
+          <button onClick={() => onOpenModal('privacy')} className="hover:text-white transition-colors focus:outline-none">Privacy</button>
+          <button onClick={() => onOpenModal('terms')} className="hover:text-white transition-colors focus:outline-none">Terms</button>
+          <button onClick={() => onOpenModal('contact')} className="hover:text-white transition-colors focus:outline-none">Contact</button>
         </div>
       </div>
     </footer>
   )
 }
 
+// ─── Privacy Modal ─────────────────────────────────────────
+function PrivacyModal({ isOpen, onClose }) {
+  if (!isOpen) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-900/60 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      <div className="bg-dark-800 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-lg w-full relative max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors" onClick={onClose}>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <h3 className="text-2xl font-black text-white mb-4">Privacy Policy</h3>
+        <div className="space-y-4 text-gray-400 text-sm leading-relaxed">
+          <p>We take your privacy seriously. This policy outlines what data we collect and how we handle it.</p>
+          <h4 className="font-bold text-white text-base">1. Data We Collect</h4>
+          <p>We collect basic details synced from your login provider (Clerk), such as your name, email, and profile image. We also save your voice transcripts, question answers, and evaluation reports so you can view your progress in the dashboard.</p>
+          <h4 className="font-bold text-white text-base">2. How We Use Data</h4>
+          <p>Your details are used solely to generate tailored mock interviews, track performance charts, and send welcome/contact emails. We never sell, lease, or share your personal data with third parties.</p>
+          <h4 className="font-bold text-white text-base">3. Data Security</h4>
+          <p>All interview session logs and user statistics are stored securely in our private Neon database. Transcripts are evaluated programmatically and securely using the Groq AI service.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Terms Modal ───────────────────────────────────────────
+function TermsModal({ isOpen, onClose }) {
+  if (!isOpen) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-900/60 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      <div className="bg-dark-800 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-lg w-full relative max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors" onClick={onClose}>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <h3 className="text-2xl font-black text-white mb-4">Terms of Service</h3>
+        <div className="space-y-4 text-gray-400 text-sm leading-relaxed">
+          <p>Welcome to AI Interviewer. By using our services, you agree to comply with and be bound by the following terms.</p>
+          <h4 className="font-bold text-white text-base">1. Acceptable Use</h4>
+          <p>You agree to use AI Interviewer solely for personal practice, education, and interview preparation. Any malicious abuse, automated scraping, or attempts to disrupt backend API operations is strictly prohibited.</p>
+          <h4 className="font-bold text-white text-base">2. Disclaimer of Warranty</h4>
+          <p>Our platform uses advanced language models to evaluate technical and conversational skills. The scores, feedback, and transcripts generated are educational guides and do not guarantee official job offers or specific hiring outcomes.</p>
+          <h4 className="font-bold text-white text-base">3. Account Integrity</h4>
+          <p>You are responsible for keeping your login credentials secure. AI Interviewer is not liable for unauthorized access or loss of personal dashboard statistics.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Contact Modal ─────────────────────────────────────────
+function ContactModal({ isOpen, onClose }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [status, setStatus] = useState('idle') // idle | loading | success | error
+  const [errMsg, setErrMsg] = useState('')
+
+  if (!isOpen) return null
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setStatus('error')
+      setErrMsg('All fields are required')
+      return
+    }
+
+    setStatus('loading')
+    setErrMsg('')
+
+    try {
+      await sendContactMessage(name, email, message)
+      setStatus('success')
+      setName('')
+      setEmail('')
+      setMessage('')
+    } catch (err) {
+      setStatus('error')
+      setErrMsg(err.message || 'Failed to send message. Please try again.')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-900/60 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      <div className="bg-dark-800 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-lg w-full relative max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors" onClick={onClose}>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <h3 className="text-2xl font-black text-white mb-2">Get in Touch</h3>
+        <p className="text-gray-400 text-sm mb-6">Have feedback, questions, or ideas for the platform? Shoot the developer a message directly.</p>
+
+        {status === 'success' ? (
+          <div className="text-center py-8 space-y-4">
+            <div className="w-16 h-16 bg-green-500/10 border border-green-500/30 rounded-full flex items-center justify-center mx-auto text-green-400">
+              <Check size={28} />
+            </div>
+            <h4 className="text-white font-bold text-lg">Message Sent!</h4>
+            <p className="text-gray-400 text-sm max-w-xs mx-auto">Your message was successfully sent to the developer. Thank you for reaching out!</p>
+            <button onClick={onClose} className="mt-4 btn-secondary mx-auto">Close Window</button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Your name"
+                className="input-field animate-fade-in"
+                required
+                disabled={status === 'loading'}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                className="input-field animate-fade-in"
+                required
+                disabled={status === 'loading'}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Message</label>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Write your message here..."
+                rows={4}
+                className="input-field resize-none animate-fade-in"
+                required
+                disabled={status === 'loading'}
+              />
+            </div>
+
+            {status === 'error' && (
+              <div className="text-red-400 text-sm font-medium bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl">
+                {errMsg}
+              </div>
+            )}
+
+            <div className="pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-1/2 btn-secondary justify-center"
+                disabled={status === 'loading'}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="w-1/2 btn-primary justify-center text-rawWhite"
+                disabled={status === 'loading'}
+              >
+                {status === 'loading' ? 'Sending...' : 'Send Message'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────
 export default function LandingPage() {
+  const [activeModal, setActiveModal] = useState(null) // 'privacy' | 'terms' | 'contact' | null
+
   return (
     <div className="bg-dark-900 text-white min-h-screen">
       <Navbar />
@@ -408,7 +579,11 @@ export default function LandingPage() {
       <Categories />
       <FAQ />
       <CTA />
-      <Footer />
+      <Footer onOpenModal={setActiveModal} />
+
+      <PrivacyModal isOpen={activeModal === 'privacy'} onClose={() => setActiveModal(null)} />
+      <TermsModal isOpen={activeModal === 'terms'} onClose={() => setActiveModal(null)} />
+      <ContactModal isOpen={activeModal === 'contact'} onClose={() => setActiveModal(null)} />
     </div>
   )
 }

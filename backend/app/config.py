@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = "mock"
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@ai-interviewer.com"
+    CONTACT_EMAIL: str = ""
+
+    # Resend API Key
+    RESEND_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
