@@ -83,7 +83,7 @@ async def sync_user(
     )
 
     # Welcome email is sent ONLY on signup
-    if user_data.is_signup and user.email and "@" in user.email:
+    if is_new_user and user.email and "@" in user.email:
         is_serverless = os.environ.get("VERCEL") is not None or os.environ.get("AWS_EXECUTION_ENV") is not None
         if is_serverless:
             logger.info("Serverless env detected — sending welcome email synchronously.")
