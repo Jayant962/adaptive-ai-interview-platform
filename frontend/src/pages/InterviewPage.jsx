@@ -488,7 +488,7 @@ export default function InterviewPage() {
       mediaStreamRef.current = null
     }
     resetInterview()
-    navigate('/dashboard')
+    navigate('/interview/setup')
   }
 
   const diffBadge = { easy: 'easy', medium: 'medium', hard: 'hard' }
