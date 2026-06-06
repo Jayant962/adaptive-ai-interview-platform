@@ -5,48 +5,53 @@ from app.config import settings
 logger = logging.getLogger("app.email")
 
 
-def _get_smtp_from() -> str:
-    return getattr(settings, 'SMTP_FROM_EMAIL', '') or ''
-
-
-def _get_resend_key() -> str:
-    return getattr(settings, 'RESEND_API_KEY', '') or ''
+def _get_brevo_key() -> str:
+    return getattr(settings, 'BREVO_API_KEY', '') or ''
 
 
 def _is_mock() -> bool:
-    key = _get_resend_key()
+    key = _get_brevo_key()
     return not key or key == 'mock'
 
 
-async def _send_via_resend(to_email: str, subject: str, html_content: str, text_content: str, reply_to: str = None) -> bool:
-    """Core Resend HTTP API sender — works on Render free tier (HTTPS port 443)."""
+async def _send_via_brevo(to_email: str, to_name: str, subject: str, html_content: str, text_content: str, reply_to: str = None) -> bool:
+    """Core Brevo HTTP API sender — works on Render free tier (HTTPS port 443)."""
     payload = {
-        "from": f"AI Interviewer <onboarding@resend.dev>",
-        "to": [to_email],
+        "sender": {
+            "name": "AI Interviewer",
+            "email": "jayantdhingra370@gmail.com"
+        },
+        "to": [
+            {
+                "email": to_email,
+                "name": to_name or to_email,
+            }
+        ],
         "subject": subject,
-        "html": html_content,
-        "text": text_content,
+        "htmlContent": html_content,
+        "textContent": text_content,
     }
     if reply_to:
-        payload["reply_to"] = reply_to
+        payload["replyTo"] = {"email": reply_to}
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://api.resend.com/emails",
+                "https://api.brevo.com/v3/smtp/email",
                 headers={
-                    "Authorization": f"Bearer {_get_resend_key()}",
+                    "api-key": _get_brevo_key(),
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
                 },
                 json=payload,
                 timeout=10.0,
             )
         if response.status_code in (200, 201):
-            logger.info(f"Email sent to {to_email}")
+            logger.info(f"Email sent to {to_email} via Brevo")
             print(f"📧 [EMAIL SENT SUCCESS] Email sent to {to_email}")
             return True
         else:
-            logger.error(f"Resend API error: {response.status_code} - {response.text}")
+            logger.error(f"Brevo API error: {response.status_code} - {response.text}")
             print(f"❌ [EMAIL SEND ERROR] {response.status_code}: {response.text}")
             return False
     except Exception as e:
@@ -58,8 +63,8 @@ async def _send_via_resend(to_email: str, subject: str, html_content: str, text_
 async def send_welcome_email(to_email: str, name: str) -> bool:
     """
     Send a welcome email to a new user.
-    Uses Resend HTTP API (works on Render free tier).
-    Falls back to mock logging if RESEND_API_KEY is not set.
+    Uses Brevo HTTP API (works on Render free tier — port 443).
+    Falls back to mock logging if BREVO_API_KEY is not set.
     """
     subject = "Welcome to AI Interviewer! 🎙️"
 
@@ -130,17 +135,17 @@ The AI Interviewer Team
         print("=" * 50 + "\n")
         return True
 
-    return await _send_via_resend(to_email, subject, html_content, text_content)
+    return await _send_via_brevo(to_email, name, subject, html_content, text_content)
 
 
 async def send_contact_email(name: str, contact_email: str, message: str) -> bool:
     """
     Send a contact form submission email to the developer.
-    Uses Resend HTTP API (works on Render free tier).
-    Falls back to mock logging if RESEND_API_KEY is not set.
+    Uses Brevo HTTP API (works on Render free tier — port 443).
+    Falls back to mock logging if BREVO_API_KEY is not set.
     """
     subject = f"New Contact Message from {name}"
-    to_email = getattr(settings, 'CONTACT_EMAIL', '') or _get_smtp_from()
+    to_email = getattr(settings, 'CONTACT_EMAIL', '') or 'adce66001@smtp-brevo.com'
 
     text_content = f"""
 New Contact Form Submission:
@@ -191,4 +196,4 @@ Message:
         print("=" * 50 + "\n")
         return True
 
-    return await _send_via_resend(to_email, subject, html_content, text_content, reply_to=contact_email)
+    return await _send_via_brevo(to_email, "AI Interviewer Team", subject, html_content, text_content, reply_to=contact_email)

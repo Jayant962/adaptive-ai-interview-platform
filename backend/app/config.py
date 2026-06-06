@@ -27,8 +27,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "noreply@ai-interviewer.com"
     CONTACT_EMAIL: str = ""
 
-    # Resend API Key
-    RESEND_API_KEY: str = ""
+    BREVO_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
