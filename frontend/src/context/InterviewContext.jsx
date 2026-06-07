@@ -8,6 +8,7 @@ export const AVATAR_STATES = {
   SPEAKING: 'speaking',
   LISTENING: 'listening',
   THINKING: 'thinking',
+  PREPARING: 'preparing',
 }
 
 // Interview phases

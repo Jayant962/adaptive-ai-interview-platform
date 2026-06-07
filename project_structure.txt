@@ -1,4 +1,5 @@
 AI Interview Platform - Project Folder Structure
+(Last updated: 2026-06-07)
 
 .
 ├── .gitignore
@@ -10,6 +11,7 @@ AI Interview Platform - Project Folder Structure
 │   ├── .env.example
 │   ├── render.yaml
 │   ├── requirements.txt
+│   ├── test_interview.db                   # SQLite DB for local testing
 │   └── app/
 │       ├── __init__.py
 │       ├── config.py
@@ -18,6 +20,7 @@ AI Interview Platform - Project Folder Structure
 │       │   └── routes/
 │       │       ├── __init__.py
 │       │       ├── auth.py
+│       │       ├── contact.py              # [NEW] Contact/email route
 │       │       ├── interview.py
 │       │       └── reports.py
 │       ├── database/
@@ -41,6 +44,7 @@ AI Interview Platform - Project Folder Structure
 │       ├── prompts/
 │       │   ├── __init__.py
 │       │   └── interview_prompts.py
+│       ├── reports/                        # [NEW] Reports module (empty)
 │       ├── schemas/
 │       │   ├── __init__.py
 │       │   ├── interview.py
@@ -58,26 +62,41 @@ AI Interview Platform - Project Folder Structure
     ├── .env
     ├── .env.example
     ├── index.html
+    ├── inspect_glb.js                      # [NEW] GLB model inspection script
     ├── package.json
+    ├── package-lock.json
     ├── postcss.config.js
     ├── tailwind.config.js
     ├── vercel.json
     ├── vite.config.js
+    ├── dist/                               # [NEW] Production build output
+    │   ├── index.html
+    │   ├── model.glb
+    │   ├── office_background.png
+    │   └── assets/
+    ├── public/
+    │   ├── model.glb
+    │   └── office_background.png           # [NEW] Office background asset
     └── src/
         ├── App.jsx
         ├── clerk-bridge.jsx
         ├── index.css
         ├── main.jsx
+        ├── assets/                         # [NEW] Static assets (empty)
         ├── components/
+        │   ├── dashboard/                  # [NEW] Dashboard components (empty)
         │   ├── interview/
         │   │   ├── AvatarPanel.jsx
         │   │   ├── FeedbackPanel.jsx
         │   │   ├── RecordingControls.jsx
         │   │   └── TranscriptPanel.jsx
+        │   ├── landing/                    # [NEW] Landing components (empty)
+        │   ├── report/                     # [NEW] Report components (empty)
         │   └── ui/
         │       └── index.jsx
         ├── context/
         │   ├── AuthContext.jsx
+        │   ├── DataContext.jsx             # [NEW] Shared data context
         │   ├── InterviewContext.jsx
         │   └── ThemeContext.jsx
         ├── hooks/
@@ -98,6 +117,7 @@ AI Interview Platform - Project Folder Structure
         ├── routes/
         │   ├── AppRouter.jsx
         │   └── ProtectedRoute.jsx
-        └── services/
-            ├── api.js
-            └── speech.js
+        ├── services/
+        │   ├── api.js
+        │   └── speech.js
+        └── utils/                          # [NEW] Frontend utilities (empty)

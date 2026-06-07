@@ -13,6 +13,7 @@ import {
 import DashboardLayout from '../layouts/DashboardLayout'
 import { Card, Badge, ScoreRing, EmptyState, PageLoader } from '../components/ui'
 import { useDataContext } from '../context/DataContext'
+import { useTheme } from '../context/ThemeContext'
 import { useGLTF } from '@react-three/drei'
 
 // Preload the 3D avatar model in the background as soon as user lands on dashboard.
@@ -47,6 +48,14 @@ const COLORS = {
 export default function DashboardPage() {
   const { user } = useUser()
   const { analytics, analyticsLoading: loading } = useDataContext()
+  const { isDark } = useTheme()
+
+  const gridStroke = isDark ? '#22222f' : '#e2e8f0'
+  const tickColor = isDark ? '#6b7280' : '#475569'
+  const tooltipBg = isDark ? '#16161f' : '#ffffff'
+  const tooltipBorder = isDark ? '#353550' : '#cbd5e1'
+  const tooltipTextColor = isDark ? '#e2e8f0' : '#0f172a'
+  const legendColor = isDark ? '#9ca3af' : '#475569'
 
   if (loading) return (
     <DashboardLayout>
@@ -147,13 +156,13 @@ export default function DashboardPage() {
                 {growthData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={growthData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#22222f" />
-                      <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                      <YAxis domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                      <XAxis dataKey="date" tick={{ fill: tickColor, fontSize: 11 }} />
+                      <YAxis domain={[0, 100]} tick={{ fill: tickColor, fontSize: 11 }} />
                       <Tooltip
-                        contentStyle={{ background: '#16161f', border: '1px solid #353550', borderRadius: '8px', color: '#e2e8f0' }}
+                        contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: '8px', color: tooltipTextColor }}
                       />
-                      <Legend wrapperStyle={{ color: '#9ca3af', fontSize: 12 }} />
+                      <Legend wrapperStyle={{ color: legendColor, fontSize: 12 }} />
                       <Line type="monotone" dataKey="Technical" stroke={COLORS.technical} strokeWidth={2} dot={{ r: 3 }} />
                       <Line type="monotone" dataKey="Communication" stroke={COLORS.communication} strokeWidth={2} dot={{ r: 3 }} />
                     </LineChart>
@@ -172,11 +181,11 @@ export default function DashboardPage() {
                 {topicData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={topicData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#22222f" />
-                      <XAxis dataKey="topic" tick={{ fill: '#6b7280', fontSize: 10 }} />
-                      <YAxis domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                      <XAxis dataKey="topic" tick={{ fill: tickColor, fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} tick={{ fill: tickColor, fontSize: 11 }} />
                       <Tooltip
-                        contentStyle={{ background: '#16161f', border: '1px solid #353550', borderRadius: '8px', color: '#e2e8f0' }}
+                        contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: '8px', color: tooltipTextColor }}
                       />
                       <Bar dataKey="score" fill="#6d5fe8" radius={[4, 4, 0, 0]} />
                     </BarChart>

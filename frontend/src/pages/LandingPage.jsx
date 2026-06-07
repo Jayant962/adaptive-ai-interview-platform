@@ -119,12 +119,12 @@ function Hero() {
         {/* Right - Feature chips */}
         <div className="hidden lg:grid grid-cols-2 gap-4 animate-slide-up">
           {[
-            { icon: Brain,      label: 'AI Powered Interviews',  desc: 'llama-3.3-70b model' },
-            { icon: MessageSquare, label: 'Real-time Feedback',  desc: 'Instant evaluation' },
-            { icon: Target,     label: 'Adaptive Questions',     desc: 'Smart follow-ups' },
-            { icon: BarChart2,  label: 'Detailed Reports',       desc: 'Per-question scores' },
-            { icon: Mic,        label: 'Voice Recognition',      desc: 'Browser speech API' },
-            { icon: TrendingUp, label: 'Track Progress',         desc: 'Monthly analytics' },
+            { icon: Brain, label: 'AI Powered Interviews', desc: 'llama-3.3-70b model' },
+            { icon: MessageSquare, label: 'Real-time Feedback', desc: 'Instant evaluation' },
+            { icon: Target, label: 'Adaptive Questions', desc: 'Smart follow-ups' },
+            { icon: BarChart2, label: 'Detailed Reports', desc: 'Per-question scores' },
+            { icon: Mic, label: 'Voice Recognition', desc: 'Browser speech API' },
+            { icon: TrendingUp, label: 'Track Progress', desc: 'Monthly analytics' },
           ].map(({ icon: Icon, label, desc }) => (
             <div key={label} className="bg-dark-700/60 backdrop-blur-sm border border-white/8 rounded-2xl p-5 hover:border-primary-500/30 transition-all group">
               <div className="w-10 h-10 bg-primary-600/20 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-600/30 transition-colors">
@@ -144,8 +144,8 @@ function Hero() {
 function Stats() {
   const stats = [
     { value: '30+', label: 'Topic Categories' },
-    { value: '3',    label: 'Difficulty Levels' },
-    { value: '5-8',  label: 'Questions Per Session' },
+    { value: '3', label: 'Difficulty Levels' },
+    { value: '5-8', label: 'Questions Per Session' },
     { value: 'Real-time', label: 'Evaluation & Feedback' },
   ]
   return (
@@ -377,7 +377,7 @@ function Footer({ onOpenModal }) {
           </div>
           <span className="text-white font-bold">AI Interviewer</span>
         </div>
-        <p className="text-gray-500 text-sm">© 2024 AI Interviewer. Built for students, by students.</p>
+        <p className="text-gray-500 text-sm">© 2026 AI Interviewer. Built for students, by students.</p>
         <div className="flex gap-6 text-sm text-gray-500">
           <button onClick={() => onOpenModal('privacy')} className="hover:text-white transition-colors focus:outline-none">Privacy</button>
           <button onClick={() => onOpenModal('terms')} className="hover:text-white transition-colors focus:outline-none">Terms</button>
@@ -508,7 +508,7 @@ function ContactModal({ isOpen, onClose }) {
                 disabled={status === 'loading'}
               />
             </div>
-            
+
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
               <input

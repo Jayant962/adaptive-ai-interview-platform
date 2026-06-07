@@ -82,11 +82,11 @@ export default function InterviewPage() {
       rate: 0.92,
       onEnd: () => {
         setPhase(INTERVIEW_PHASES.RECORDING)
-        setAvatarState(AVATAR_STATES.LISTENING)
+        setAvatarState(AVATAR_STATES.IDLE)
       },
       onError: () => {
         setPhase(INTERVIEW_PHASES.RECORDING)
-        setAvatarState(AVATAR_STATES.LISTENING)
+        setAvatarState(AVATAR_STATES.IDLE)
       }
     })
   }, [setPhase, setAvatarState])
@@ -128,7 +128,7 @@ export default function InterviewPage() {
   const startRecording = useCallback(() => {
     shouldSpeakRef.current = false
     stopSpeaking()
-    setAvatarState(AVATAR_STATES.IDLE)
+    setAvatarState(AVATAR_STATES.LISTENING)
     setPhase(INTERVIEW_PHASES.RECORDING)
 
     setFinalTranscript('')
@@ -451,7 +451,7 @@ export default function InterviewPage() {
 
     // Get next main question
     setLoadingNext(true)
-    setAvatarState(AVATAR_STATES.THINKING)
+    setAvatarState(AVATAR_STATES.PREPARING)
     try {
       const result = await getNextQuestion(token, sessionId)
       if (!result.has_next) {

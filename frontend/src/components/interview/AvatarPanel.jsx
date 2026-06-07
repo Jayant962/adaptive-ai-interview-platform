@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react'
+import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
@@ -10,7 +10,7 @@ import { useTheme } from '../../context/ThemeContext'
 // ─── State badge config ────────────────────────────────────────────────────────
 const STATE_CONFIG = {
   [AVATAR_STATES.IDLE]: {
-    label: 'Ready',
+    label: 'Waiting',
     color: 'bg-gray-500',
     ring: 'ring-gray-500/20',
     pulse: false,
@@ -36,6 +36,13 @@ const STATE_CONFIG = {
     ring: 'ring-amber-500/30',
     pulse: true,
     text: 'text-amber-400',
+  },
+  [AVATAR_STATES.PREPARING]: {
+    label: 'Preparing',
+    color: 'bg-purple-500',
+    ring: 'ring-purple-500/30',
+    pulse: true,
+    text: 'text-purple-400',
   },
 }
 
@@ -138,6 +145,32 @@ const POSES = {
     mouthSmileLeft: 0.12,
     mouthSmileRight: 0.12,
     mouthSmile: 0.08, // Subtle pleasant ready pose
+    mouthPressLeft: 0,
+    mouthPressRight: 0,
+    noseSneerLeft: 0,
+    noseSneerRight: 0,
+    eyeLookUp: 0,
+    eyeLookOut: 0,
+  },
+
+  [AVATAR_STATES.PREPARING]: {
+    spine: { x: 0, y: 0, z: 0 },
+    neck: { x: 0, y: 0, z: 0 },
+    head: { x: 0, y: 0, z: 0 },
+    browInnerUp: 0,
+    browOuterUpLeft: 0,
+    browOuterUpRight: 0,
+    browDownLeft: 0,
+    browDownRight: 0,
+    eyeWideLeft: 0,
+    eyeWideRight: 0,
+    eyeSquintLeft: 0,
+    eyeSquintRight: 0,
+    cheekSquintLeft: 0,
+    cheekSquintRight: 0,
+    mouthSmileLeft: 0.12,
+    mouthSmileRight: 0.12,
+    mouthSmile: 0.08,
     mouthPressLeft: 0,
     mouthPressRight: 0,
     noseSneerLeft: 0,
@@ -306,8 +339,9 @@ function AvatarModel({ avatarState, onModelLoaded }) {
         child.frustumCulled = false
 
         const materialName = child.material?.name?.toLowerCase() || ''
-        if (child.material) {
+        if (child.material && !child.material.__cloned) {
           child.material = child.material.clone()
+          child.material.__cloned = true
           child.material.needsUpdate = true
         }
 
@@ -694,6 +728,16 @@ function AvatarModel({ avatarState, onModelLoaded }) {
 // ─── Preload ──────────────────────────────────────────────────────────────────
 useGLTF.preload('/model.glb')
 
+// ─── Static configuration for Canvas ──────────────────────────────────────────
+const CANVAS_CAMERA_CONFIG = { fov: 40 }
+const CANVAS_GL_CONFIG = {
+  antialias: true,
+  toneMapping: THREE.ACESFilmicToneMapping,
+  toneMappingExposure: 1.16,
+  outputColorSpace: THREE.SRGBColorSpace,
+}
+const CANVAS_STYLE = { background: 'transparent' }
+
 // ─── Main panel component ─────────────────────────────────────────────────────
 export default function AvatarPanel({ avatarState = AVATAR_STATES.IDLE, avatarUrl = null, showControls = true }) {
   const config = STATE_CONFIG[avatarState] || STATE_CONFIG[AVATAR_STATES.IDLE]
@@ -703,10 +747,10 @@ export default function AvatarPanel({ avatarState = AVATAR_STATES.IDLE, avatarUr
   const [modelScene, setModelScene] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const handleModelLoaded = (sc) => {
+  const handleModelLoaded = useCallback((sc) => {
     setModelScene(sc)
     setLoading(false)
-  }
+  }, [])
 
   // Get theme status safely
   let isDark = true
@@ -760,14 +804,9 @@ export default function AvatarPanel({ avatarState = AVATAR_STATES.IDLE, avatarUr
 
             <Canvas
               shadows
-              camera={{ fov: 40 }}
-              gl={{
-                antialias: true,
-                toneMapping: THREE.ACESFilmicToneMapping,
-                toneMappingExposure: 1.16,
-                outputColorSpace: THREE.SRGBColorSpace,
-              }}
-              style={{ background: 'transparent' }}
+              camera={CANVAS_CAMERA_CONFIG}
+              gl={CANVAS_GL_CONFIG}
+              style={CANVAS_STYLE}
             >
               {/* Studio lighting */}
               <ambientLight intensity={isNight ? 0.28 : 0.78} />
@@ -855,6 +894,7 @@ function FallbackAvatar({ avatarState, config }) {
   const isSpeaking = avatarState === AVATAR_STATES.SPEAKING
   const isListening = avatarState === AVATAR_STATES.LISTENING
   const isThinking = avatarState === AVATAR_STATES.THINKING
+  const isPreparing = avatarState === AVATAR_STATES.PREPARING
 
   return (
     <div className="w-full h-full bg-gradient-to-b from-dark-600 to-dark-800 flex flex-col items-center justify-center relative">
@@ -863,7 +903,7 @@ function FallbackAvatar({ avatarState, config }) {
       <div className={clsx(
         'relative transition-all duration-300',
         isSpeaking && 'scale-105',
-        isThinking && 'translate-y-1',
+        (isThinking || isPreparing) && 'translate-y-1',
       )}>
         {/* Head */}
         <div className={clsx(
@@ -892,8 +932,8 @@ function FallbackAvatar({ avatarState, config }) {
               <div className="w-8 h-1 bg-gray-600 rounded-full" />
             )}
           </div>
-          {/* Thinking dots */}
-          {isThinking && (
+          {/* Thinking/Preparing dots */}
+          {(isThinking || isPreparing) && (
             <div className="absolute -top-2 -right-2 flex gap-0.5">
               {[0, 1, 2].map(i => (
                 <div key={i} className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce"

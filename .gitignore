@@ -52,3 +52,6 @@ out/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Project documentation / guides
+codebase_guide.txt
