@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { useUser, useAuth as useClerkAuth, useSession, useClerk } from '../clerk-bridge'
 import { syncUser } from '../services/api'
 
@@ -12,12 +12,14 @@ export function AuthProvider({ children }) {
   const [dbUser, setDbUser] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncComplete, setSyncComplete] = useState(false)
+  const hasSyncedRef = useRef(false)
 
   // Reset sync state when user logs out
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       setDbUser(null)
       setSyncComplete(false)
+      hasSyncedRef.current = false
     }
   }, [isLoaded, isSignedIn])
 
@@ -49,6 +51,8 @@ export function AuthProvider({ children }) {
     if (!isLoaded || !isSignedIn || !user) return
 
     const sync = async () => {
+      if (hasSyncedRef.current) return
+      hasSyncedRef.current = true
       setSyncing(true)
       const isSignupFlow = window.location.pathname === '/signup' || sessionStorage.getItem('is_signup_flow') === 'true'
       try {
